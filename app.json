@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "CocoBae POS",
+    "slug": "cocobae",
+    "version": "1.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0F0A06",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0F0A06"
+      },
+      "package": "com.cocobae.pos",
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_EXTERNAL_STORAGE",
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_CONNECT",
+        "BLUETOOTH_SCAN"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#F5A623"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4cec3062-e41d-4213-a1b7-d9911b5048bb"
+      }
+    },
+    "owner": "dhairya1"
+  }
+}

@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   globals.css — CocoBae Design Tokens
+   All colors, typography, spacing & radii live here ONLY.
+   Single source of truth for the entire app.
+   ============================================================ */
+
+:root {
+  /* Backgrounds */
+  --color-bg: #0f0a06; /* Deep espresso black */
+  --color-surface: #1c1208; /* Dark cocoa */
+  --color-surface-2: #281b0e; /* Elevated cards */
+  --color-glass: rgba(255, 255, 255, 0.06); /* Frosted glass */
+  --color-glass-border: rgba(255, 255, 255, 0.12); /* Glass border */
+  --color-overlay: rgba(0, 0, 0, 0.75); /* Backdrop */
+
+  /* Brand Accents */
+  --color-primary: #f5a623; /* Liquid gold / amber */
+  --color-primary-dark: #c97e0f; /* Darker gold for active states */
+  --color-primary-glow: rgba(245, 166, 35, 0.25);
+  --color-secondary: #e8836a; /* Rose gold */
+  --color-success: #4caf7d; /* Emerald */
+  --color-danger: #e85d5d; /* Warm red */
+  --color-nonveg: #e53935; /* Non-veg indicator */
+
+  /* Text */
+  --color-text: #fff3e0; /* Warm cream primary */
+  --color-text-muted: #b8956a; /* Muted caramel secondary */
+  --color-text-disabled: #6a4e38; /* Disabled text */
+  --color-text-inverse: #0f0a06; /* Inverse text on primary buttons */
+
+  /* Borders & Dividers */
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(245, 166, 35, 0.4);
+  --color-divider: rgba(255, 255, 255, 0.07);
+
+  /* Category Gradient Pairs */
+  --grad-cake-from: #ff6b6b;
+  --grad-cake-to: #ffe66d;
+  --grad-icecream-from: #4ecdc4;
+  --grad-icecream-to: #556270;
+  --grad-waffle-from: #f7971e;
+  --grad-waffle-to: #ffd200;
+  --grad-shake-from: #a18cd1;
+  --grad-shake-to: #fbc2eb;
+  --grad-brownie-from: #8b4513;
+  --grad-brownie-to: #d2691e;
+  --grad-pudding-from: #f3904f;
+  --grad-pudding-to: #3b4371;
+
+  /* Typography */
+  --font-display: PlayfairDisplay-Bold;
+  --font-heading: CormorantGaramond-SemiBold;
+  --font-body: Poppins-Regular;
+  --font-body-medium: Poppins-Medium;
+  --font-body-semibold: Poppins-SemiBold;
+
+  /* Font Sizes */
+  --text-2xs: 10px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 16px;
+  --text-lg: 18px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 28px;
+  --text-4xl: 34px;
+  --text-5xl: 42px;
+  --text-display: 56px;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Radii */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+  --radius-full: 9999px;
+}

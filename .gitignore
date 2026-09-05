@@ -1,0 +1,22 @@
+node_modules/
+.expo/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# macOS
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Android/iOS native folders if generated
+android/
+ios/
