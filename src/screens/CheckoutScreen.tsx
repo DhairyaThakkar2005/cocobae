@@ -273,7 +273,9 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "space-between",
-                marginBottom: 4,
+                flexWrap: "wrap",
+                gap: 8,
+                marginBottom: 6,
               }}
             >
               <Text
@@ -281,6 +283,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                   color: THEME.colors.text,
                   fontSize: 15,
                   fontWeight: "700",
+                  flexShrink: 1,
                 }}
               >
                 Customer Mobile Number (Optional)
@@ -292,8 +295,11 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                   gap: 4,
                   backgroundColor: "rgba(37, 211, 102, 0.15)",
                   paddingHorizontal: 8,
-                  paddingVertical: 2,
-                  borderRadius: 12,
+                  paddingVertical: 3,
+                  borderRadius: THEME.radius.full,
+                  borderWidth: 1,
+                  borderColor: "rgba(37, 211, 102, 0.3)",
+                  alignSelf: "flex-start",
                 }}
               >
                 <MessageCircle size={12} color="#25D366" />

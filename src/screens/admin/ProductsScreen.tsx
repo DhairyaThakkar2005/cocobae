@@ -143,6 +143,14 @@ export const ProductsScreen: React.FC = () => {
     }
   };
 
+  const handleSelectImageSource = () => {
+    Alert.alert("Dessert Photo", "Choose an option to add dessert photo:", [
+      { text: "Take Photo (Camera)", onPress: handleTakePhoto },
+      { text: "Choose from Gallery", onPress: handlePickImage },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
   const handleOpenAdd = () => {
     setEditingProduct(null);
     setFormName("");
@@ -526,111 +534,197 @@ export const ProductsScreen: React.FC = () => {
           >
             Dessert Photo
           </Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-            {formImagePath ? (
-              <View style={{ position: "relative" }}>
+
+          {formImagePath ? (
+            /* Uploaded State: Full-width container, clickable to replace, small top-right ✕ */
+            <View
+              style={{
+                width: "100%",
+                height: 170,
+                borderRadius: THEME.radius.lg,
+                borderWidth: 1.5,
+                borderColor: THEME.colors.primary,
+                overflow: "hidden",
+                position: "relative",
+                backgroundColor: THEME.colors.surface2,
+              }}
+            >
+              <TouchableOpacity
+                onPress={handleSelectImageSource}
+                activeOpacity={0.85}
+                style={{ width: "100%", height: "100%" }}
+              >
                 <Image
                   source={{ uri: formImagePath }}
                   style={{
-                    width: 72,
-                    height: 72,
-                    borderRadius: THEME.radius.md,
-                    borderWidth: 1,
-                    borderColor: THEME.colors.primary,
+                    width: "100%",
+                    height: "100%",
                   }}
                   resizeMode="cover"
                 />
-                <TouchableOpacity
-                  onPress={() => setFormImagePath("")}
-                  activeOpacity={0.8}
+                {/* Subtle overlay pill suggesting tap to change */}
+                <View
                   style={{
                     position: "absolute",
-                    top: -6,
-                    right: -6,
-                    backgroundColor: THEME.colors.danger,
-                    borderRadius: 12,
-                    width: 22,
-                    height: 22,
-                    justifyContent: "center",
+                    bottom: 10,
+                    left: 10,
+                    backgroundColor: "rgba(15, 10, 6, 0.75)",
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: THEME.radius.full,
+                    flexDirection: "row",
                     alignItems: "center",
+                    gap: 5,
+                    borderWidth: 1,
+                    borderColor: THEME.colors.border,
                   }}
                 >
-                  <X size={14} color="#FFF" />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View
+                  <Camera size={12} color={THEME.colors.primary} />
+                  <Text style={{ color: THEME.colors.text, fontSize: 11, fontWeight: "600" }}>
+                    Tap to Change
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Small ✕ delete icon on top-right */}
+              <TouchableOpacity
+                onPress={() => setFormImagePath("")}
+                activeOpacity={0.8}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: THEME.radius.md,
-                  borderWidth: 1,
-                  borderColor: THEME.colors.border,
+                  position: "absolute",
+                  top: 10,
+                  right: 10,
+                  backgroundColor: "rgba(232, 93, 93, 0.9)",
+                  borderRadius: 14,
+                  width: 28,
+                  height: 28,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 3,
+                  elevation: 4,
+                }}
+              >
+                <X size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            /* Empty State: Full-width container inviting upload with Camera & Gallery options */
+            <View style={{ gap: 10 }}>
+              <TouchableOpacity
+                onPress={handleSelectImageSource}
+                activeOpacity={0.8}
+                style={{
+                  width: "100%",
+                  height: 130,
+                  borderRadius: THEME.radius.lg,
+                  borderWidth: 1.5,
+                  borderStyle: "dashed",
+                  borderColor: THEME.colors.borderStrong,
                   backgroundColor: THEME.colors.surface2,
                   justifyContent: "center",
                   alignItems: "center",
+                  padding: 16,
                 }}
               >
-                <ImageIcon size={26} color={THEME.colors.textMuted} />
+                <View
+                  style={{
+                    width: 46,
+                    height: 46,
+                    borderRadius: 23,
+                    backgroundColor: THEME.colors.primaryGlow,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginBottom: 8,
+                  }}
+                >
+                  <ImageIcon size={22} color={THEME.colors.primary} />
+                </View>
+                <Text
+                  style={{
+                    color: THEME.colors.text,
+                    fontSize: 14,
+                    fontWeight: "700",
+                  }}
+                >
+                  Upload Dessert Photo
+                </Text>
+                <Text
+                  style={{
+                    color: THEME.colors.textMuted,
+                    fontSize: 11,
+                    marginTop: 2,
+                  }}
+                >
+                  Tap here or use buttons below
+                </Text>
+              </TouchableOpacity>
+
+              {/* Camera / Gallery Quick Action Buttons (shown only in empty state) */}
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TouchableOpacity
+                  onPress={handlePickImage}
+                  activeOpacity={0.8}
+                  style={{
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    backgroundColor: THEME.colors.surface2,
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    borderRadius: THEME.radius.md,
+                    borderWidth: 1,
+                    borderColor: THEME.colors.border,
+                  }}
+                >
+                  <ImageIcon size={15} color={THEME.colors.primary} />
+                  <Text
+                    style={{
+                      color: THEME.colors.text,
+                      fontSize: 12,
+                      fontWeight: "600",
+                    }}
+                  >
+                    Choose Gallery
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleTakePhoto}
+                  activeOpacity={0.8}
+                  style={{
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    backgroundColor: THEME.colors.surface2,
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    borderRadius: THEME.radius.md,
+                    borderWidth: 1,
+                    borderColor: THEME.colors.border,
+                  }}
+                >
+                  <Camera size={15} color={THEME.colors.primary} />
+                  <Text
+                    style={{
+                      color: THEME.colors.text,
+                      fontSize: 12,
+                      fontWeight: "600",
+                    }}
+                  >
+                    Take Camera
+                  </Text>
+                </TouchableOpacity>
               </View>
-            )}
-
-            <View style={{ flex: 1, gap: 8 }}>
-              <TouchableOpacity
-                onPress={handlePickImage}
-                activeOpacity={0.8}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  backgroundColor: THEME.colors.surface2,
-                  paddingVertical: 8,
-                  paddingHorizontal: 12,
-                  borderRadius: THEME.radius.md,
-                  borderWidth: 1,
-                  borderColor: THEME.colors.border,
-                }}
-              >
-                <ImageIcon size={15} color={THEME.colors.primary} />
-                <Text
-                  style={{
-                    color: THEME.colors.text,
-                    fontSize: 12,
-                    fontWeight: "600",
-                  }}
-                >
-                  Choose from Gallery
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleTakePhoto}
-                activeOpacity={0.8}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  backgroundColor: THEME.colors.surface2,
-                  paddingVertical: 8,
-                  paddingHorizontal: 12,
-                  borderRadius: THEME.radius.md,
-                  borderWidth: 1,
-                  borderColor: THEME.colors.border,
-                }}
-              >
-                <Camera size={15} color={THEME.colors.primary} />
-                <Text
-                  style={{
-                    color: THEME.colors.text,
-                    fontSize: 12,
-                    fontWeight: "600",
-                  }}
-                >
-                  Take Photo with Camera
-                </Text>
-              </TouchableOpacity>
             </View>
-          </View>
+          )}
         </View>
 
         {/* Veg Toggle */}
