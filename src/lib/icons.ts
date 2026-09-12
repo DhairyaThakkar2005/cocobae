@@ -50,4 +50,6 @@ export {
   Wallet,
   ChevronDown,
   CalendarRange,
+  RotateCcw,
+  ShieldCheck,
 } from "lucide-react-native";

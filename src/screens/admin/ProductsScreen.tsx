@@ -33,6 +33,7 @@ import {
   ImageIcon,
   X,
 } from "../../lib/icons";
+import { resolveProductImageUri, toRelativeImagePath } from "../../lib/imageUtils";
 import { Dialog } from "../../components/ui/dialog";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -104,7 +105,7 @@ export const ProductsScreen: React.FC = () => {
           from: result.assets[0].uri,
           to: destUri,
         });
-        setFormImagePath(destUri);
+        setFormImagePath(toRelativeImagePath(destUri));
       }
     } catch (err: any) {
       Alert.alert("Image Error", err.message || "Could not pick image.");
@@ -136,7 +137,7 @@ export const ProductsScreen: React.FC = () => {
           from: result.assets[0].uri,
           to: destUri,
         });
-        setFormImagePath(destUri);
+        setFormImagePath(toRelativeImagePath(destUri));
       }
     } catch (err: any) {
       Alert.alert("Camera Error", err.message || "Could not take photo.");
@@ -186,6 +187,10 @@ export const ProductsScreen: React.FC = () => {
     }
 
     try {
+      const relativePath = formImagePath.trim()
+        ? toRelativeImagePath(formImagePath.trim())
+        : null;
+
       if (editingProduct) {
         await updateProduct(editingProduct.id, {
           name: formName.trim(),
@@ -194,7 +199,7 @@ export const ProductsScreen: React.FC = () => {
           category_id: formCategoryId,
           is_veg: formIsVeg,
           is_available: editingProduct.is_available,
-          image_path: formImagePath.trim() || null,
+          image_path: relativePath,
         });
       } else {
         await addProduct({
@@ -204,7 +209,7 @@ export const ProductsScreen: React.FC = () => {
           category_id: formCategoryId,
           is_veg: formIsVeg,
           is_available: 1,
-          image_path: formImagePath.trim() || null,
+          image_path: relativePath,
         });
       }
       setModalVisible(false);
@@ -308,9 +313,9 @@ export const ProductsScreen: React.FC = () => {
             }}
           >
             {/* Product Thumbnail */}
-            {p.image_path ? (
+            {resolveProductImageUri(p.image_path) ? (
               <Image
-                source={{ uri: p.image_path }}
+                source={{ uri: resolveProductImageUri(p.image_path)! }}
                 style={{
                   width: 50,
                   height: 50,
@@ -555,7 +560,9 @@ export const ProductsScreen: React.FC = () => {
                 style={{ width: "100%", height: "100%" }}
               >
                 <Image
-                  source={{ uri: formImagePath }}
+                  source={{
+                    uri: resolveProductImageUri(formImagePath) || formImagePath,
+                  }}
                   style={{
                     width: "100%",
                     height: "100%",

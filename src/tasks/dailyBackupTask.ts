@@ -82,6 +82,8 @@ export async function registerDailyBackupTask() {
   }
 }
 
+import { createFullBackupZip, getBackupArchives, shareBackupArchive } from "../lib/backupMigration";
+
 export async function performDatabaseBackup(
   triggerType: "auto" | "manual",
 ): Promise<{
@@ -92,95 +94,15 @@ export async function performDatabaseBackup(
   customFolderName?: string;
   error?: string;
 }> {
-  try {
-    const today = new Date().toISOString().split("T")[0];
-    const timestamp = Date.now().toString().slice(-4);
-    const filename = `cocobae_backup_${today}_${timestamp}.db`;
-
-    const docDir = (FileSystem as any).documentDirectory || "";
-    const dbDir = `${docDir}SQLite/`;
-    const srcDbPath = `${dbDir}cocobae.db`;
-
-    // Ensure target backup directory exists
-    const backupDir = `${docDir}CocoBae_Backups/`;
-    const dirInfo = await FileSystem.getInfoAsync(backupDir);
-    if (!dirInfo.exists) {
-      await FileSystem.makeDirectoryAsync(backupDir, { intermediates: true });
-    }
-
-    const destPath = `${backupDir}${filename}`;
-
-    // Verify source exists
-    const srcInfo = await FileSystem.getInfoAsync(srcDbPath);
-    if (!srcInfo.exists) {
-      const fallbackSrc = `${docDir}cocobae.db`;
-      const fallbackInfo = await FileSystem.getInfoAsync(fallbackSrc);
-      if (fallbackInfo.exists) {
-        await FileSystem.copyAsync({ from: fallbackSrc, to: destPath });
-      } else {
-        throw new Error("Database source file not found");
-      }
-    } else {
-      await FileSystem.copyAsync({ from: srcDbPath, to: destPath });
-    }
-
-    // Prune old backups based on retention policy
-    const retentionDays =
-      parseInt(await getSetting("retention_days", "7"), 10) || 7;
-    await pruneOldBackups(backupDir, retentionDays);
-
-    // Log to DB
-    await logBackup(destPath, triggerType, "success");
-
-    // If custom backup directory URI is configured, also copy into user's chosen folder
-    let customFolderSaved = false;
-    let customFolderName: string | undefined;
-
-    try {
-      const customDirUri = await getSetting("backup_directory_uri", "");
-      customFolderName = await getSetting("backup_directory_name", "");
-
-      if (customDirUri && FileSystem.StorageAccessFramework) {
-        const fileContent = await FileSystem.readAsStringAsync(destPath, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-
-        const createdFileUri =
-          await FileSystem.StorageAccessFramework.createFileAsync(
-            customDirUri,
-            filename,
-            "application/x-sqlite3",
-          );
-
-        await FileSystem.writeAsStringAsync(createdFileUri, fileContent, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-
-        customFolderSaved = true;
-      }
-    } catch (safErr) {
-      console.warn("[BackupTask] SAF custom folder sync notice:", safErr);
-    }
-
-    // Trigger local notification (showing custom folder location if saved)
+  const res = await createFullBackupZip(triggerType);
+  if (res.success) {
     await sendLocalBackupNotification(
-      filename,
-      destPath,
-      customFolderSaved ? customFolderName : undefined,
+      res.filename,
+      res.path,
+      res.customFolderSaved ? res.customFolderName : undefined,
     );
-
-    return {
-      success: true,
-      filename,
-      path: destPath,
-      customFolderSaved,
-      customFolderName,
-    };
-  } catch (err: any) {
-    console.error("[BackupTask] Backup failure:", err);
-    await logBackup("", triggerType, "failed");
-    return { success: false, filename: "", path: "", error: err.message };
   }
+  return res;
 }
 
 export async function requestCustomBackupDirectory(): Promise<{
@@ -239,44 +161,13 @@ export async function exportBackupToCustomFolder(
 }
 
 export async function getBackupFiles(): Promise<
-  Array<{ name: string; uri: string; size?: number; modificationTime?: number }>
+  Array<{ name: string; uri: string; isZip?: boolean; size?: number; modificationTime?: number }>
 > {
-  try {
-    const docDir = (FileSystem as any).documentDirectory || "";
-    const backupDir = `${docDir}CocoBae_Backups/`;
-    const dirInfo = await FileSystem.getInfoAsync(backupDir);
-    if (!dirInfo.exists) return [];
-
-    const files = await FileSystem.readDirectoryAsync(backupDir);
-    const result = [];
-    for (const f of files) {
-      if (f.endsWith(".db")) {
-        const fileInfo = await FileSystem.getInfoAsync(`${backupDir}${f}`);
-        result.push({
-          name: f,
-          uri: `${backupDir}${f}`,
-          size: fileInfo.exists ? fileInfo.size : undefined,
-          modificationTime: fileInfo.exists
-            ? fileInfo.modificationTime
-            : undefined,
-        });
-      }
-    }
-    return result.sort(
-      (a, b) => (b.modificationTime || 0) - (a.modificationTime || 0),
-    );
-  } catch (e) {
-    return [];
-  }
+  return await getBackupArchives();
 }
 
 export async function shareBackupFile(uri: string) {
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, {
-      mimeType: "application/x-sqlite3",
-      dialogTitle: "Export CocoBae Database Backup",
-    });
-  }
+  await shareBackupArchive(uri, uri.endsWith(".zip"));
 }
 
 async function pruneOldBackups(dir: string, maxDays: number) {

@@ -16,6 +16,7 @@ import { formatINR } from "../lib/utils";
 import { QuantitySelector } from "./QuantitySelector";
 import { X, Cake, Sparkles } from "../lib/icons";
 import { useBreakpoint } from "../theme/breakpoints";
+import { resolveProductImageUri } from "../lib/imageUtils";
 
 export interface ProductDetailModalProps {
   visible: boolean;
@@ -119,9 +120,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     position: "relative",
                   }}
                 >
-                  {product.image_path ? (
+                  {resolveProductImageUri(product.image_path) ? (
                     <Image
-                      source={{ uri: product.image_path }}
+                      source={{ uri: resolveProductImageUri(product.image_path)! }}
                       style={{ width: "100%", height: "100%" }}
                       resizeMode="cover"
                     />

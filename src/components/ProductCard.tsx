@@ -5,6 +5,7 @@ import { THEME } from "../theme/tokens";
 import { Product } from "../db/products";
 import { formatINR } from "../lib/utils";
 import { Plus, Minus, Cake } from "../lib/icons";
+import { resolveProductImageUri } from "../lib/imageUtils";
 
 export interface ProductCardProps {
   product: Product;
@@ -27,10 +28,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const gradFrom = product.grad_from || THEME.gradients.cake[0];
   const gradTo = product.grad_to || THEME.gradients.cake[1];
+  const resolvedImgUri = resolveProductImageUri(product.image_path);
 
   return (
     <TouchableOpacity
-      activeOpacity={0.85}
+      activeOpacity={0.88}
       onPress={onPress}
       style={[
         {
@@ -49,9 +51,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     >
       {/* Product Image or Category Gradient Banner */}
       <View style={{ height: 110, width: "100%", position: "relative" }}>
-        {product.image_path ? (
+        {resolvedImgUri ? (
           <Image
-            source={{ uri: product.image_path }}
+            source={{ uri: resolvedImgUri }}
             style={{ width: "100%", height: "100%" }}
             resizeMode="cover"
           />

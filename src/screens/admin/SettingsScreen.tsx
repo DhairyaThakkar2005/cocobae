@@ -8,7 +8,9 @@ import {
   Switch,
   Alert,
   ActivityIndicator,
+  Modal,
 } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
 import { THEME } from "../../theme/tokens";
 import { getAllSettings, setSetting } from "../../db/settings";
 import {
@@ -18,6 +20,11 @@ import {
   requestCustomBackupDirectory,
   exportBackupToCustomFolder,
 } from "../../tasks/dailyBackupTask";
+import {
+  validateBackupArchive,
+  restoreFullBackup,
+  BackupValidationResult,
+} from "../../lib/backupMigration";
 import { getBackupLogs, BackupLogEntry } from "../../db/backupLog";
 import {
   Settings,
@@ -32,6 +39,10 @@ import {
   Layers,
   FolderOpen,
   Phone,
+  RotateCcw,
+  ShieldCheck,
+  Upload,
+  X,
 } from "../../lib/icons";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -41,6 +52,14 @@ export const SettingsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
+
+  // Restore state
+  const [restoreModalVisible, setRestoreModalVisible] = useState(false);
+  const [restoreTargetUri, setRestoreTargetUri] = useState<string | null>(null);
+  const [restoreTargetName, setRestoreTargetName] = useState<string>("");
+  const [restoreValidation, setRestoreValidation] = useState<BackupValidationResult | null>(null);
+  const [restoreLoading, setRestoreLoading] = useState(false);
+  const [validating, setValidating] = useState(false);
 
   // Settings state
   const [cafeName, setCafeName] = useState("CocoBae");
@@ -159,18 +178,77 @@ export const SettingsScreen: React.FC = () => {
           : "";
 
         Alert.alert(
-          "Backup Completed",
-          `Database snapshot saved:\n${res.filename}${destMessage}\n\nYou can access the .db file directly in your file manager or share it.`,
+          "Full Backup Created",
+          `Complete migration archive generated:\n📦 ${res.filename}\n\nIncludes database, all dessert photos, and manifest.${destMessage}`,
         );
         loadSettingsAndBackups();
       } else {
         Alert.alert(
           "Backup Failed",
-          res.error || "Could not copy SQLite database.",
+          res.error || "Could not generate full backup.",
         );
       }
     } finally {
       setBackupLoading(false);
+    }
+  };
+
+  const openRestoreModal = async (uri: string, name: string) => {
+    setRestoreTargetUri(uri);
+    setRestoreTargetName(name);
+    setValidating(true);
+    setRestoreModalVisible(true);
+    try {
+      const val = await validateBackupArchive(uri);
+      setRestoreValidation(val);
+    } catch (err: any) {
+      setRestoreValidation({
+        isValid: false,
+        fileType: "zip",
+        error: err.message || "Failed to inspect archive.",
+      });
+    } finally {
+      setValidating(false);
+    }
+  };
+
+  const handlePickBackupForRestore = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          "application/zip",
+          "application/x-zip-compressed",
+          "application/x-sqlite3",
+          "application/octet-stream",
+          "*/*",
+        ],
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const file = result.assets[0];
+        await openRestoreModal(file.uri, file.name);
+      }
+    } catch (e: any) {
+      Alert.alert("File Picker Error", e.message || "Could not select backup file.");
+    }
+  };
+
+  const handleExecuteRestore = async () => {
+    if (!restoreTargetUri) return;
+    setRestoreLoading(true);
+    try {
+      const res = await restoreFullBackup(restoreTargetUri);
+      setRestoreModalVisible(false);
+      Alert.alert(
+        "✅ Restore Completed!",
+        `Device migration succeeded!\n\n• Products: ${res.restoredProducts}\n• Dessert Photos Restored: ${res.restoredImages}\n• Orders: ${res.restoredOrders}\n\nAll data and images are now active.`,
+      );
+      loadSettingsAndBackups();
+    } catch (err: any) {
+      Alert.alert("Restore Failed", err.message || "Could not restore backup.");
+    } finally {
+      setRestoreLoading(false);
     }
   };
 
@@ -506,16 +584,27 @@ export const SettingsScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Manual Backup Action Button */}
-        <Button
-          onPress={handleManualBackup}
-          loading={backupLoading}
-          variant="secondary"
-          icon={<Database size={16} color={THEME.colors.primary} />}
-          style={{ marginTop: 6 }}
-        >
-          Backup Database Now (Snapshot)
-        </Button>
+        {/* Backup & Restore Action Buttons */}
+        <View style={{ flexDirection: "row", gap: 10, marginTop: 6 }}>
+          <Button
+            onPress={handleManualBackup}
+            loading={backupLoading}
+            variant="secondary"
+            icon={<Database size={16} color={THEME.colors.primary} />}
+            style={{ flex: 1 }}
+          >
+            Create Full Backup (ZIP)
+          </Button>
+
+          <Button
+            onPress={handlePickBackupForRestore}
+            variant="outline"
+            icon={<RotateCcw size={16} color={THEME.colors.primary} />}
+            style={{ flex: 1 }}
+          >
+            Import & Restore
+          </Button>
+        </View>
       </View>
 
       {/* Save Settings CTA */}
@@ -557,8 +646,7 @@ export const SettingsScreen: React.FC = () => {
             marginBottom: 12,
           }}
         >
-          To transfer your database to another Android phone, tap Share to send
-          the .db file (via WhatsApp/Drive/Bluetooth).
+          Complete .zip migration archives include all database records and dessert photos. Tap Restore to apply or Share to transfer to another phone.
         </Text>
 
         {backupFiles.length === 0 ? (
@@ -569,7 +657,7 @@ export const SettingsScreen: React.FC = () => {
               fontStyle: "italic",
             }}
           >
-            No backup snapshots generated yet. Tap "Backup Database Now" above.
+            No backup snapshots generated yet. Tap "Create Full Backup (ZIP)" above.
           </Text>
         ) : (
           backupFiles.map((file, idx) => (
@@ -586,16 +674,39 @@ export const SettingsScreen: React.FC = () => {
               }}
             >
               <View style={{ flex: 1, marginRight: 10 }}>
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    color: THEME.colors.text,
-                    fontSize: 12,
-                    fontWeight: "600",
-                  }}
-                >
-                  {file.name}
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                  <View
+                    style={{
+                      backgroundColor: file.name.endsWith(".zip")
+                        ? "rgba(16, 185, 129, 0.2)"
+                        : "rgba(245, 166, 35, 0.2)",
+                      borderRadius: 4,
+                      paddingHorizontal: 6,
+                      paddingVertical: 1,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: file.name.endsWith(".zip") ? "#10B981" : THEME.colors.primary,
+                        fontSize: 9,
+                        fontWeight: "800",
+                      }}
+                    >
+                      {file.name.endsWith(".zip") ? "FULL ZIP" : "SQLITE DB"}
+                    </Text>
+                  </View>
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      color: THEME.colors.text,
+                      fontSize: 12,
+                      fontWeight: "600",
+                      flex: 1,
+                    }}
+                  >
+                    {file.name}
+                  </Text>
+                </View>
                 <Text
                   style={{
                     color: THEME.colors.textMuted,
@@ -605,10 +716,26 @@ export const SettingsScreen: React.FC = () => {
                 >
                   {file.size
                     ? `${(file.size / 1024).toFixed(1)} KB`
-                    : "Local SQLite DB"}
+                    : "Backup Archive"}
+                  {file.name.endsWith(".zip") ? " • Database + Photos" : " • Database Only"}
                 </Text>
               </View>
               <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                {/* 1. Restore Action */}
+                <TouchableOpacity
+                  onPress={() => openRestoreModal(file.uri, file.name)}
+                  style={{
+                    backgroundColor: THEME.colors.primaryGlow,
+                    padding: 8,
+                    borderRadius: THEME.radius.md,
+                    borderWidth: 1,
+                    borderColor: THEME.colors.primary,
+                  }}
+                >
+                  <RotateCcw size={15} color={THEME.colors.primary} />
+                </TouchableOpacity>
+
+                {/* 2. Export to Folder Action */}
                 <TouchableOpacity
                   onPress={() => handleExportToFolder(file.uri, file.name)}
                   style={{
@@ -619,20 +746,21 @@ export const SettingsScreen: React.FC = () => {
                     borderColor: THEME.colors.border,
                   }}
                 >
-                  <FolderOpen size={16} color={THEME.colors.text} />
+                  <FolderOpen size={15} color={THEME.colors.text} />
                 </TouchableOpacity>
 
+                {/* 3. Share Action */}
                 <TouchableOpacity
                   onPress={() => handleShareFile(file.uri)}
                   style={{
-                    backgroundColor: THEME.colors.primaryGlow,
+                    backgroundColor: THEME.colors.surface,
                     padding: 8,
                     borderRadius: THEME.radius.md,
                     borderWidth: 1,
-                    borderColor: THEME.colors.primary,
+                    borderColor: THEME.colors.border,
                   }}
                 >
-                  <Share2 size={16} color={THEME.colors.primary} />
+                  <Share2 size={15} color={THEME.colors.text} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -706,6 +834,194 @@ export const SettingsScreen: React.FC = () => {
           ))
         )}
       </View>
+
+      {/* Restore Confirmation & Validation Modal */}
+      <Modal
+        visible={restoreModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !restoreLoading && setRestoreModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.78)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: THEME.colors.surface,
+              borderRadius: THEME.radius.xl,
+              borderWidth: 1.5,
+              borderColor: THEME.colors.primaryGlow,
+              padding: 22,
+              width: "100%",
+              maxWidth: 420,
+            }}
+          >
+            {/* Modal Header */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 16,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <RotateCcw size={20} color={THEME.colors.primary} />
+                <Text style={{ color: THEME.colors.text, fontSize: 18, fontWeight: "800" }}>
+                  Restore Backup
+                </Text>
+              </View>
+              {!restoreLoading && (
+                <TouchableOpacity onPress={() => setRestoreModalVisible(false)}>
+                  <X size={20} color={THEME.colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {validating ? (
+              <View style={{ paddingVertical: 30, alignItems: "center", gap: 12 }}>
+                <ActivityIndicator color={THEME.colors.primary} size="large" />
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                  Validating archive integrity & manifest...
+                </Text>
+              </View>
+            ) : restoreValidation && !restoreValidation.isValid ? (
+              <View style={{ gap: 14 }}>
+                <View
+                  style={{
+                    backgroundColor: "rgba(229, 57, 53, 0.15)",
+                    borderWidth: 1,
+                    borderColor: THEME.colors.danger,
+                    borderRadius: THEME.radius.md,
+                    padding: 14,
+                  }}
+                >
+                  <Text style={{ color: THEME.colors.danger, fontWeight: "800", fontSize: 14 }}>
+                    Validation Error
+                  </Text>
+                  <Text style={{ color: THEME.colors.text, fontSize: 12, marginTop: 4 }}>
+                    {restoreValidation.error || "This file is not a recognized CocoBae backup archive."}
+                  </Text>
+                </View>
+
+                <Button
+                  onPress={() => setRestoreModalVisible(false)}
+                  variant="outline"
+                  style={{ marginTop: 6 }}
+                >
+                  Close
+                </Button>
+              </View>
+            ) : (
+              <View style={{ gap: 14 }}>
+                {/* Archive Info Card */}
+                <View
+                  style={{
+                    backgroundColor: THEME.colors.surface2,
+                    borderRadius: THEME.radius.md,
+                    borderWidth: 1,
+                    borderColor: THEME.colors.border,
+                    padding: 14,
+                    gap: 8,
+                  }}
+                >
+                  <Text style={{ color: THEME.colors.textMuted, fontSize: 11, fontWeight: "600" }}>
+                    BACKUP ARCHIVE
+                  </Text>
+                  <Text style={{ color: THEME.colors.text, fontSize: 13, fontWeight: "700" }}>
+                    📁 {restoreTargetName}
+                  </Text>
+
+                  <Separator />
+
+                  {restoreValidation?.manifest ? (
+                    <View style={{ gap: 6 }}>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                        <Text style={{ color: THEME.colors.textMuted, fontSize: 12 }}>Created:</Text>
+                        <Text style={{ color: THEME.colors.text, fontSize: 12, fontWeight: "600" }}>
+                          {new Date(restoreValidation.manifest.createdAt).toLocaleString()}
+                        </Text>
+                      </View>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                        <Text style={{ color: THEME.colors.textMuted, fontSize: 12 }}>Products:</Text>
+                        <Text style={{ color: THEME.colors.primary, fontSize: 12, fontWeight: "700" }}>
+                          {restoreValidation.manifest.productCount} items
+                        </Text>
+                      </View>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                        <Text style={{ color: THEME.colors.textMuted, fontSize: 12 }}>Dessert Photos:</Text>
+                        <Text style={{ color: "#10B981", fontSize: 12, fontWeight: "700" }}>
+                          {restoreValidation.imageCount ?? restoreValidation.manifest.imageCount} photos included
+                        </Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <Text style={{ color: THEME.colors.textMuted, fontSize: 12 }}>
+                      Legacy SQLite database snapshot.
+                    </Text>
+                  )}
+                </View>
+
+                {/* Safety Backup Protection Notice */}
+                <View
+                  style={{
+                    backgroundColor: "rgba(16, 185, 129, 0.12)",
+                    borderRadius: THEME.radius.md,
+                    borderWidth: 1,
+                    borderColor: "#10B981",
+                    padding: 12,
+                    flexDirection: "row",
+                    gap: 10,
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <ShieldCheck size={20} color="#10B981" style={{ marginTop: 2 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: "#10B981", fontWeight: "800", fontSize: 12 }}>
+                      Automatic Safety Backup Active
+                    </Text>
+                    <Text style={{ color: THEME.colors.text, fontSize: 11, marginTop: 2, lineHeight: 15 }}>
+                      A safety snapshot of your current database and photos will be saved before restoring. If anything goes wrong, changes are automatically rolled back.
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Warning note */}
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 11, fontStyle: "italic", textAlign: "center" }}>
+                  Current menu, categories, and orders will be replaced with this backup.
+                </Text>
+
+                {/* Modal Buttons */}
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+                  <Button
+                    onPress={() => setRestoreModalVisible(false)}
+                    variant="ghost"
+                    disabled={restoreLoading}
+                    style={{ flex: 1 }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onPress={handleExecuteRestore}
+                    variant="primary"
+                    loading={restoreLoading}
+                    icon={<RotateCcw size={16} color="#FFF" />}
+                    style={{ flex: 1 }}
+                  >
+                    Confirm & Restore
+                  </Button>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
