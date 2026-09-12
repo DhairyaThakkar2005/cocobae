@@ -34,6 +34,13 @@
         {
           "color": "#F5A623"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow CocoBae to access your photos to select dessert images.",
+          "cameraPermission": "Allow CocoBae to access your camera to take dessert photos."
+        }
       ]
     ],
     "extra": {
