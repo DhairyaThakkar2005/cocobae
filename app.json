@@ -8,9 +8,11 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "icon": "./assets/icon.png",
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0F0A06"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F7F7F7"
       },
       "package": "com.cocobae.pos",
       "permissions": [

@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TextInput, TouchableOpacity } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, Image } from "react-native";
 import { THEME } from "../theme/tokens";
 import { Search, Settings, Cake, X } from "../lib/icons";
 import { useBreakpoint } from "../theme/breakpoints";
@@ -39,17 +39,25 @@ export const Header: React.FC<HeaderProps> = ({
         }}
       >
         {/* Brand Logo & Name */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           <View
             style={{
-              backgroundColor: THEME.colors.primaryGlow,
-              borderRadius: THEME.radius.sm,
-              padding: 6,
-              borderWidth: 1,
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: "#FFF8F0",
+              alignItems: "center",
+              justifyContent: "center",
+              borderWidth: 1.5,
               borderColor: THEME.colors.primary,
+              overflow: "hidden",
             }}
           >
-            <Cake size={20} color={THEME.colors.primary} />
+            <Image
+              source={require("../../assets/logo.png")}
+              style={{ width: 28, height: 28 }}
+              resizeMode="contain"
+            />
           </View>
           <View>
             <Text
