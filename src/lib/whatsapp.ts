@@ -1,4 +1,4 @@
-﻿import { Linking, Alert } from "react-native";
+import { Linking, Alert } from "react-native";
 import { Order } from "../db/orders";
 import { formatINR } from "./utils";
 
@@ -16,36 +16,9 @@ export function buildWhatsAppReceiptMessage(
   options: WhatsAppOrderMessageOptions = {},
 ): string {
   const cafeName = options.cafeName || "CocoBae Dessert Café";
-  const items = order.items || [];
-
-  const itemsList = items
-    .map(
-      (it) =>
-        `• *${it.product_name}* (x${it.quantity}) — ₹${Math.round(it.subtotal)}`,
-    )
-    .join("\n");
-
-  const formattedDate = new Date(order.order_date || Date.now()).toLocaleDateString(
-    "en-IN",
-    {
-      dateStyle: "medium",
-    },
-  );
 
   return (
-    `🍨 *${cafeName.toUpperCase()}*\n` +
-    `_One sip and the world melts away_\n` +
-    `--------------------------------\n` +
-    `🧾 *Tax Invoice:* #${order.order_number}\n` +
-    `📅 *Date:* ${formattedDate}\n` +
-    `👤 *Customer:* ${order.customer_name || "Guest"}\n` +
-    `💳 *Payment:* ${(order.payment_method || "Cash").toUpperCase()} (PAID)\n` +
-    `--------------------------------\n` +
-    `*Your Sweet Treats:*\n${itemsList || "• Dessert items"}\n` +
-    `--------------------------------\n` +
-    `*Total Paid:* *₹${Math.round(order.total_amount)}*\n` +
-    `--------------------------------\n\n` +
-    `✨ *Thank you so much for visiting CocoBae!*\n` +
+    `✨ *Thank you so much for visiting ${cafeName}!*\n` +
     `We hope our desserts brought a sweet smile to your day! Have a wonderful time and see you again soon for more delicious treats! 🍨🍫\n\n` +
     `_Warm regards,_\n` +
     `*Team ${cafeName}*`
