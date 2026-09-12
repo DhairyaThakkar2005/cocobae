@@ -1,15 +1,17 @@
-import { Linking, Alert } from "react-native";
+﻿import { Linking, Alert } from "react-native";
+import Share, { ShareSingleOptions } from "react-native-share";
 import { Order } from "../db/orders";
-import { formatINR } from "./utils";
+import { generateInvoicePdf } from "./pdfInvoice";
 
 export interface WhatsAppOrderMessageOptions {
   cafeName?: string;
   storePhone?: string;
   storeCity?: string;
+  upiId?: string;
 }
 
 /**
- * Builds a friendly, positive, high-conversion WhatsApp invoice receipt message.
+ * Builds the exact warm positive brand message.
  */
 export function buildWhatsAppReceiptMessage(
   order: Order,
@@ -26,10 +28,11 @@ export function buildWhatsAppReceiptMessage(
 }
 
 /**
- * Opens customer's WhatsApp chat directly with a pre-filled positive paragraph message.
- * Formats Indian 10-digit mobile numbers with international country prefix 91 automatically.
+ * Shares the PDF Invoice with the positive message attached directly to WhatsApp.
+ * Uses react-native-share's shareSingle targetted to WhatsApp with the recipient's phone number,
+ * so the PDF file and positive caption open directly in WhatsApp for that customer!
  */
-export async function openDirectCustomerWhatsApp(
+export async function sendInvoicePdfViaWhatsApp(
   phoneNumber: string,
   order: Order,
   options: WhatsAppOrderMessageOptions = {},
@@ -43,7 +46,6 @@ export async function openDirectCustomerWhatsApp(
     return false;
   }
 
-  // Ensure 91 country code prefix for WhatsApp universal link
   const targetPhone =
     rawPhone.length === 10
       ? `91${rawPhone}`
@@ -51,33 +53,62 @@ export async function openDirectCustomerWhatsApp(
         ? `91${rawPhone.slice(1)}`
         : rawPhone;
 
-  const textMessage = buildWhatsAppReceiptMessage(order, options);
-  const encodedText = encodeURIComponent(textMessage);
-
-  // 1. Direct App Scheme (Opens directly in WhatsApp without browser intermediary)
-  const appScheme = `whatsapp://send?phone=${targetPhone}&text=${encodedText}`;
-  // 2. Universal Web Fallback (Official WhatsApp API)
-  const webScheme = `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodedText}`;
+  const positiveMessage = buildWhatsAppReceiptMessage(order, options);
 
   try {
-    const canOpen = await Linking.canOpenURL(appScheme);
-    if (canOpen) {
-      await Linking.openURL(appScheme);
+    // 1. Generate the branded Tax Invoice PDF
+    const pdfPath = await generateInvoicePdf(order, {
+      cafeName: options.cafeName,
+      storePhone: options.storePhone,
+      storeCity: options.storeCity,
+      upiId: options.upiId,
+    });
+
+    const fileUrl = pdfPath.startsWith("file://") ? pdfPath : `file://${pdfPath}`;
+
+    // 2. Direct WhatsApp Single-Client Share with PDF File + Message Caption + Customer Number
+    try {
+      const shareOptions = {
+        title: `CocoBae Invoice #${order.order_number}`,
+        message: positiveMessage,
+        url: fileUrl,
+        type: "application/pdf",
+        social: Share.Social.WHATSAPP,
+        whatsAppNumber: targetPhone,
+      } as any;
+
+      await Share.shareSingle(shareOptions);
       return true;
-    } else {
-      await Linking.openURL(webScheme);
-      return true;
+    } catch (shareErr) {
+      // Fallback to open dialog with PDF file + message pre-filled
+      try {
+        await Share.open({
+          title: `CocoBae Invoice #${order.order_number}`,
+          message: positiveMessage,
+          url: fileUrl,
+          type: "application/pdf",
+        });
+        return true;
+      } catch {
+        const encodedText = encodeURIComponent(positiveMessage);
+        const appScheme = `whatsapp://send?phone=${targetPhone}&text=${encodedText}`;
+        await Linking.openURL(appScheme);
+        return true;
+      }
     }
   } catch (err: any) {
-    try {
-      await Linking.openURL(webScheme);
-      return true;
-    } catch (fallbackErr: any) {
-      Alert.alert(
-        "WhatsApp Notice",
-        "Could not open WhatsApp directly. Please ensure WhatsApp is installed on this phone.",
-      );
-      return false;
-    }
+    Alert.alert("WhatsApp Notice", err.message || "Could not open WhatsApp.");
+    return false;
   }
+}
+
+/**
+ * Backward-compatible helper that triggers PDF + message sharing
+ */
+export async function openDirectCustomerWhatsApp(
+  phoneNumber: string,
+  order: Order,
+  options: WhatsAppOrderMessageOptions = {},
+): Promise<boolean> {
+  return sendInvoicePdfViaWhatsApp(phoneNumber, order, options);
 }
