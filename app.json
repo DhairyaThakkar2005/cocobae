@@ -5,10 +5,6 @@
     "version": "1.0.0",
     "orientation": "default",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "backgroundColor": "#0F0A06",
-      "resizeMode": "contain"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -41,7 +37,9 @@
           "photosPermission": "Allow CocoBae to access your photos to select dessert images.",
           "cameraPermission": "Allow CocoBae to access your camera to take dessert photos."
         }
-      ]
+      ],
+      "expo-sharing",
+      "expo-sqlite"
     ],
     "extra": {
       "eas": {
