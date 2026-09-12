@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, TouchableOpacity, ScrollView, BackHandler } from "react-native";
 import { THEME } from "../../theme/tokens";
 import { useBreakpoint } from "../../theme/breakpoints";
 import {
@@ -39,6 +39,21 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToPOS }) => {
     { id: "sales", label: "Sales Reports", icon: BarChart3 },
     { id: "settings", label: "Settings & Backup", icon: Settings },
   ];
+
+  // Android back button: if not on first tab (products), go back to products tab; otherwise return to POS
+  useEffect(() => {
+    const onBackPress = () => {
+      if (activeTab !== "products") {
+        setActiveTab("products");
+        return true;
+      }
+      onBackToPOS();
+      return true;
+    };
+
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, [activeTab, onBackToPOS]);
 
   return (
     <View style={{ flex: 1, backgroundColor: THEME.colors.bg }}>

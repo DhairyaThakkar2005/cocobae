@@ -14,6 +14,7 @@ import { useCartStore } from "../store/cartStore";
 import { createOrder, Order } from "../db/orders";
 import { getAllSettings } from "../db/settings";
 import { generateInvoicePdf, shareInvoicePdf } from "../lib/pdfInvoice";
+import { openDirectCustomerWhatsApp } from "../lib/whatsapp";
 import { formatINR } from "../lib/utils";
 import {
   ArrowLeft,
@@ -151,20 +152,17 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       // Attach order items to created object for PDF generator
       created.items = itemsPayload;
 
-      // Automated digital bill PDF delivery if phone number provided
+      // Automated digital bill delivery via WhatsApp directly to customer chat
       const rawPhone = customerPhone.replace(/[^0-9]/g, "");
       if (rawPhone.length >= 10) {
         try {
-          const pdfUri = await generateInvoicePdf(created, {
+          await openDirectCustomerWhatsApp(rawPhone, created, {
             cafeName: storeSettings.cafeName,
             storePhone: storeSettings.storePhone,
             storeCity: storeSettings.storeCity,
-            upiId: storeSettings.upiId,
           });
-
-          await shareInvoicePdf(pdfUri, created.order_number);
-        } catch (pdfErr) {
-          console.warn("Could not auto-dispatch PDF invoice:", pdfErr);
+        } catch (whatsAppErr) {
+          console.warn("Could not auto-dispatch WhatsApp message:", whatsAppErr);
         }
       }
 

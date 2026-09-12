@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  BackHandler,
 } from "react-native";
 import { THEME } from "../../theme/tokens";
 import {
@@ -105,6 +106,19 @@ export const SalesScreen: React.FC = () => {
     setRefreshing(true);
     loadData();
   };
+
+  // Hardware back press listener when viewing a detailed sub-report
+  useEffect(() => {
+    if (!activeReport) return;
+
+    const onBackPress = () => {
+      setActiveReport(null);
+      return true;
+    };
+
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, [activeReport]);
 
   // Full-Screen Report Detail Views
   if (activeReport === "sales-by-date") {
@@ -310,7 +324,7 @@ export const SalesScreen: React.FC = () => {
                   alignItems: "center",
                 }}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1, marginRight: 8 }}>
                   <View
                     style={{
                       width: 44,
@@ -321,11 +335,12 @@ export const SalesScreen: React.FC = () => {
                       borderColor: THEME.colors.primary,
                       alignItems: "center",
                       justifyContent: "center",
+                      flexShrink: 0,
                     }}
                   >
                     <Calendar size={22} color={THEME.colors.primary} />
                   </View>
-                  <View>
+                  <View style={{ flex: 1 }}>
                     <Text
                       style={{
                         color: THEME.colors.text,
@@ -336,6 +351,7 @@ export const SalesScreen: React.FC = () => {
                       Sales by Date
                     </Text>
                     <Text
+                      numberOfLines={2}
                       style={{
                         color: THEME.colors.textMuted,
                         fontSize: 12,
@@ -348,7 +364,9 @@ export const SalesScreen: React.FC = () => {
                   </View>
                 </View>
 
-                <ChevronRight size={18} color={THEME.colors.primary} />
+                <View style={{ flexShrink: 0 }}>
+                  <ChevronRight size={18} color={THEME.colors.primary} />
+                </View>
               </View>
 
               {/* Snapshot Row */}
@@ -401,7 +419,7 @@ export const SalesScreen: React.FC = () => {
                   alignItems: "center",
                 }}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1, marginRight: 8 }}>
                   <View
                     style={{
                       width: 44,
@@ -412,11 +430,12 @@ export const SalesScreen: React.FC = () => {
                       borderColor: THEME.colors.secondary,
                       alignItems: "center",
                       justifyContent: "center",
+                      flexShrink: 0,
                     }}
                   >
                     <Cake size={22} color={THEME.colors.secondary} />
                   </View>
-                  <View>
+                  <View style={{ flex: 1 }}>
                     <Text
                       style={{
                         color: THEME.colors.text,
@@ -427,6 +446,7 @@ export const SalesScreen: React.FC = () => {
                       Product Sales & Rankings
                     </Text>
                     <Text
+                      numberOfLines={2}
                       style={{
                         color: THEME.colors.textMuted,
                         fontSize: 12,
@@ -439,7 +459,9 @@ export const SalesScreen: React.FC = () => {
                   </View>
                 </View>
 
-                <ChevronRight size={18} color={THEME.colors.primary} />
+                <View style={{ flexShrink: 0 }}>
+                  <ChevronRight size={18} color={THEME.colors.primary} />
+                </View>
               </View>
 
               {/* Snapshot Row */}
@@ -500,7 +522,7 @@ export const SalesScreen: React.FC = () => {
                   alignItems: "center",
                 }}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1, marginRight: 8 }}>
                   <View
                     style={{
                       width: 44,
@@ -511,11 +533,12 @@ export const SalesScreen: React.FC = () => {
                       borderColor: THEME.colors.success,
                       alignItems: "center",
                       justifyContent: "center",
+                      flexShrink: 0,
                     }}
                   >
                     <Users size={22} color={THEME.colors.success} />
                   </View>
-                  <View>
+                  <View style={{ flex: 1 }}>
                     <Text
                       style={{
                         color: THEME.colors.text,
@@ -526,6 +549,7 @@ export const SalesScreen: React.FC = () => {
                       Customer Sales & History
                     </Text>
                     <Text
+                      numberOfLines={2}
                       style={{
                         color: THEME.colors.textMuted,
                         fontSize: 12,
@@ -538,7 +562,9 @@ export const SalesScreen: React.FC = () => {
                   </View>
                 </View>
 
-                <ChevronRight size={18} color={THEME.colors.primary} />
+                <View style={{ flexShrink: 0 }}>
+                  <ChevronRight size={18} color={THEME.colors.primary} />
+                </View>
               </View>
 
               {/* Snapshot Row */}
@@ -591,7 +617,7 @@ export const SalesScreen: React.FC = () => {
                   alignItems: "center",
                 }}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1, marginRight: 8 }}>
                   <View
                     style={{
                       width: 44,
@@ -602,11 +628,12 @@ export const SalesScreen: React.FC = () => {
                       borderColor: "#A18CD1",
                       alignItems: "center",
                       justifyContent: "center",
+                      flexShrink: 0,
                     }}
                   >
                     <Layers size={22} color="#A18CD1" />
                   </View>
-                  <View>
+                  <View style={{ flex: 1 }}>
                     <Text
                       style={{
                         color: THEME.colors.text,
@@ -617,6 +644,7 @@ export const SalesScreen: React.FC = () => {
                       Category Sales Comparison
                     </Text>
                     <Text
+                      numberOfLines={2}
                       style={{
                         color: THEME.colors.textMuted,
                         fontSize: 12,
@@ -629,7 +657,9 @@ export const SalesScreen: React.FC = () => {
                   </View>
                 </View>
 
-                <ChevronRight size={18} color={THEME.colors.primary} />
+                <View style={{ flexShrink: 0 }}>
+                  <ChevronRight size={18} color={THEME.colors.primary} />
+                </View>
               </View>
 
               {/* Progress bars preview */}
@@ -717,7 +747,7 @@ export const SalesScreen: React.FC = () => {
                   alignItems: "center",
                 }}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1, marginRight: 8 }}>
                   <View
                     style={{
                       width: 44,
@@ -728,11 +758,12 @@ export const SalesScreen: React.FC = () => {
                       borderColor: THEME.colors.primary,
                       alignItems: "center",
                       justifyContent: "center",
+                      flexShrink: 0,
                     }}
                   >
                     <Wallet size={22} color={THEME.colors.primary} />
                   </View>
-                  <View>
+                  <View style={{ flex: 1 }}>
                     <Text
                       style={{
                         color: THEME.colors.text,
@@ -743,6 +774,7 @@ export const SalesScreen: React.FC = () => {
                       Payment Channels Report
                     </Text>
                     <Text
+                      numberOfLines={2}
                       style={{
                         color: THEME.colors.textMuted,
                         fontSize: 12,
@@ -755,7 +787,9 @@ export const SalesScreen: React.FC = () => {
                   </View>
                 </View>
 
-                <ChevronRight size={18} color={THEME.colors.primary} />
+                <View style={{ flexShrink: 0 }}>
+                  <ChevronRight size={18} color={THEME.colors.primary} />
+                </View>
               </View>
 
               {/* Payment Split Chips */}

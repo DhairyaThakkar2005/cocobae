@@ -5,13 +5,15 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Modal,
+  StatusBar,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { THEME } from "../../theme/tokens";
 import { getOrders, Order } from "../../db/orders";
 import { getAllSettings } from "../../db/settings";
 import { formatINR } from "../../lib/utils";
-import { Receipt, Eye, Calendar, Clock } from "../../lib/icons";
-import { Dialog } from "../../components/ui/dialog";
+import { Receipt, Eye, Calendar, Clock, X, ArrowLeft } from "../../lib/icons";
 import { BillReceipt } from "../../components/BillReceipt";
 
 export const OrderHistoryScreen: React.FC = () => {
@@ -216,23 +218,80 @@ export const OrderHistoryScreen: React.FC = () => {
         </ScrollView>
       )}
 
-      {/* Bill View Dialog */}
-      <Dialog
+      {/* Full-Screen Bill View Modal */}
+      <Modal
         visible={receiptVisible}
-        onClose={() => setReceiptVisible(false)}
-        title={
-          selectedOrder ? `Receipt #${selectedOrder.order_number}` : "Receipt"
-        }
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setReceiptVisible(false)}
       >
-        {selectedOrder && (
-          <BillReceipt
-            order={selectedOrder}
-            cafeName={cafeName}
-            upiId={upiId}
-            onNewOrder={() => setReceiptVisible(false)}
-          />
-        )}
-      </Dialog>
+        <SafeAreaView style={{ flex: 1, backgroundColor: THEME.colors.bg }} edges={["top", "bottom"]}>
+          <StatusBar barStyle="light-content" backgroundColor={THEME.colors.surface} />
+          
+          {/* Receipt Top Header */}
+          <View
+            style={{
+              backgroundColor: THEME.colors.surface,
+              borderBottomWidth: 1,
+              borderBottomColor: THEME.colors.border,
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => setReceiptVisible(false)}
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+            >
+              <ArrowLeft size={20} color={THEME.colors.primary} />
+              <View>
+                <Text
+                  style={{
+                    color: THEME.colors.text,
+                    fontSize: 17,
+                    fontWeight: "800",
+                  }}
+                >
+                  {selectedOrder ? `Receipt #${selectedOrder.order_number}` : "Bill Receipt"}
+                </Text>
+                <Text
+                  style={{
+                    color: THEME.colors.textMuted,
+                    fontSize: 11,
+                  }}
+                >
+                  Tap back to return to orders
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setReceiptVisible(false)}
+              style={{
+                backgroundColor: THEME.colors.surface2,
+                padding: 8,
+                borderRadius: THEME.radius.full,
+              }}
+            >
+              <X size={18} color={THEME.colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Fully Scrollable Bill Receipt */}
+          <View style={{ flex: 1 }}>
+            {selectedOrder && (
+              <BillReceipt
+                order={selectedOrder}
+                cafeName={cafeName}
+                upiId={upiId}
+                onNewOrder={() => setReceiptVisible(false)}
+              />
+            )}
+          </View>
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 };

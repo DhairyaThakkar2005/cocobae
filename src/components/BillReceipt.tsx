@@ -8,6 +8,7 @@ import { THEME } from "../theme/tokens";
 import { Order } from "../db/orders";
 import { getSetting } from "../db/settings";
 import { generateInvoicePdf, shareInvoicePdf } from "../lib/pdfInvoice";
+import { openDirectCustomerWhatsApp } from "../lib/whatsapp";
 import { formatINR } from "../lib/utils";
 import {
   Printer,
@@ -270,7 +271,7 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
     }
   };
 
-  // Direct 1-tap WhatsApp PDF bill sender
+  // Direct 1-tap WhatsApp chat opener with positive receipt message
   const handleSendWhatsApp = async () => {
     const rawPhone = (order.customer_phone || "").replace(/[^0-9]/g, "");
     if (!rawPhone || rawPhone.length < 10) {
@@ -281,18 +282,11 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
       return;
     }
 
-    try {
-      const pdfUri = await generateInvoicePdf(order, {
-        cafeName,
-        storePhone,
-        storeCity,
-        upiId,
-      });
-
-      await shareInvoicePdf(pdfUri, order.order_number);
-    } catch (err: any) {
-      Alert.alert("WhatsApp Error", err.message || "Could not share PDF invoice.");
-    }
+    await openDirectCustomerWhatsApp(rawPhone, order, {
+      cafeName,
+      storePhone,
+      storeCity,
+    });
   };
 
   return (
@@ -661,18 +655,26 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
                 backgroundColor: "#25D366",
                 borderRadius: THEME.radius.md,
                 paddingVertical: 12,
+                paddingHorizontal: 14,
                 flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 8,
+                width: "100%",
               }}
             >
-              <MessageCircle size={18} color="#FFFFFF" />
+              <View style={{ flexShrink: 0 }}>
+                <MessageCircle size={18} color="#FFFFFF" />
+              </View>
               <Text
+                numberOfLines={1}
+                ellipsizeMode="tail"
                 style={{
                   color: "#FFFFFF",
                   fontSize: 14,
                   fontWeight: "800",
+                  flexShrink: 1,
+                  textAlign: "center",
                 }}
               >
                 Send Bill via WhatsApp (+91 {order.customer_phone})

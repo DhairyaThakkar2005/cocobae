@@ -1,6 +1,6 @@
 import "react-native-gesture-handler";
-import React, { useState, useEffect } from "react";
-import { View, Text, ActivityIndicator, StatusBar } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { View, Text, ActivityIndicator, StatusBar, BackHandler, ToastAndroid } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { THEME } from "./src/theme/tokens";
 import { initDatabase } from "./src/db/schema";
@@ -77,14 +77,67 @@ export default function App() {
     );
   }
 
+  const [screenStack, setScreenStack] = useState<AppScreen[]>(["home"]);
+  const lastBackPressTime = useRef(0);
+
+  const navigateTo = (screen: AppScreen) => {
+    setCurrentScreen(screen);
+    setScreenStack((prev) => [...prev, screen]);
+  };
+
+  const navigateBack = () => {
+    if (screenStack.length > 1) {
+      const newStack = [...screenStack];
+      newStack.pop(); // remove current
+      const prevScreen = newStack[newStack.length - 1] || "home";
+      setScreenStack(newStack);
+      setCurrentScreen(prevScreen);
+      return true;
+    }
+
+    if (currentScreen !== "home") {
+      setCurrentScreen("home");
+      setScreenStack(["home"]);
+      return true;
+    }
+
+    // On home screen: prevent accidental exit with double-tap toast
+    const now = Date.now();
+    if (now - lastBackPressTime.current < 2000) {
+      BackHandler.exitApp();
+      return true;
+    } else {
+      lastBackPressTime.current = now;
+      if (ToastAndroid && ToastAndroid.show) {
+        ToastAndroid.show("Press back again to exit CocoBae", ToastAndroid.SHORT);
+      }
+      return true;
+    }
+  };
+
+  // Android hardware back button and navigation gesture handler
+  useEffect(() => {
+    const onBackPress = () => {
+      return navigateBack();
+    };
+
+    const backHandlerSubscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      onBackPress,
+    );
+
+    return () => backHandlerSubscription.remove();
+  }, [currentScreen, screenStack]);
+
   const handleOrderPlaced = (order: Order) => {
     setActiveOrder(order);
-    setCurrentScreen("bill");
+    navigateTo("bill");
   };
 
   const handleNewOrder = () => {
     setActiveOrder(null);
     setCurrentScreen("home");
+    setScreenStack(["home"]);
   };
 
   return (
@@ -100,22 +153,22 @@ export default function App() {
 
         {currentScreen === "home" && (
           <HomeScreen
-            onNavigateCart={() => setCurrentScreen("cart")}
-            onNavigateCheckout={() => setCurrentScreen("checkout")}
-            onNavigateAdmin={() => setCurrentScreen("admin")}
+            onNavigateCart={() => navigateTo("cart")}
+            onNavigateCheckout={() => navigateTo("checkout")}
+            onNavigateAdmin={() => navigateTo("admin")}
           />
         )}
 
         {currentScreen === "cart" && (
           <CartScreen
-            onBack={() => setCurrentScreen("home")}
-            onProceedCheckout={() => setCurrentScreen("checkout")}
+            onBack={navigateBack}
+            onProceedCheckout={() => navigateTo("checkout")}
           />
         )}
 
         {currentScreen === "checkout" && (
           <CheckoutScreen
-            onBack={() => setCurrentScreen("cart")}
+            onBack={navigateBack}
             onOrderPlaced={handleOrderPlaced}
           />
         )}
@@ -125,7 +178,7 @@ export default function App() {
         )}
 
         {currentScreen === "admin" && (
-          <AdminLayout onBackToPOS={() => setCurrentScreen("home")} />
+          <AdminLayout onBackToPOS={navigateBack} />
         )}
       </SafeAreaView>
     </SafeAreaProvider>
