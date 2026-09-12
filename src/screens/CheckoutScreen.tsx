@@ -12,7 +12,8 @@ import {
 import { THEME } from "../theme/tokens";
 import { useCartStore } from "../store/cartStore";
 import { createOrder, Order } from "../db/orders";
-import { getSetting } from "../db/settings";
+import { getAllSettings } from "../db/settings";
+import { generateInvoicePdf, shareInvoicePdf } from "../lib/pdfInvoice";
 import { formatINR } from "../lib/utils";
 import {
   ArrowLeft,
@@ -57,10 +58,27 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     "cash",
   );
   const [loading, setLoading] = useState(false);
-  const [cafeName, setCafeName] = useState("CocoBae Dessert Café");
+  const [storeSettings, setStoreSettings] = useState<{
+    cafeName: string;
+    storePhone: string;
+    storeCity: string;
+    upiId: string;
+  }>({
+    cafeName: "CocoBae Dessert Café",
+    storePhone: "919999999999",
+    storeCity: "Anand, Gujarat",
+    upiId: "cocobae@upi",
+  });
 
   useEffect(() => {
-    getSetting("cafe_name", "CocoBae Dessert Café").then(setCafeName);
+    getAllSettings().then((s) => {
+      setStoreSettings({
+        cafeName: s.cafe_name || "CocoBae Dessert Café",
+        storePhone: s.store_phone || "919999999999",
+        storeCity: s.store_city || "Anand, Gujarat",
+        upiId: s.upi_id || "cocobae@upi",
+      });
+    });
   }, []);
 
   const totalItems = getTotalItemsCount();
@@ -98,44 +116,24 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
 
       const created = await createOrder(orderPayload, itemsPayload);
 
-      // Automated digital bill delivery via WhatsApp if phone number provided
+      // Attach order items to created object for PDF generator
+      created.items = itemsPayload;
+
+      // Automated digital bill PDF delivery if phone number provided
       const rawPhone = customerPhone.replace(/[^0-9]/g, "");
       if (rawPhone.length >= 10) {
-        const targetPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
-        const itemsList = items
-          .map((it) => `• ${it.product.name}  ${it.product.price} x${it.quantity} = ₹${it.subtotal}`)
-          .join("\n");
+        try {
+          const pdfUri = await generateInvoicePdf(created, {
+            cafeName: storeSettings.cafeName,
+            storePhone: storeSettings.storePhone,
+            storeCity: storeSettings.storeCity,
+            upiId: storeSettings.upiId,
+          });
 
-        const whatsappText =
-          `🍨 *${cafeName.toUpperCase()}*\n` +
-          `--------------------------------\n` +
-          `🧾 *Receipt: #${created.order_number}*\n` +
-          `📅 *Date:* ${new Date().toLocaleDateString("en-IN", { dateStyle: "medium" })}\n` +
-          `👤 *Customer:* ${created.customer_name || "Guest"}\n` +
-          `💳 *Payment:* ${paymentMethod.toUpperCase()} (PAID)\n` +
-          `--------------------------------\n` +
-          `*Items:*\n${itemsList}\n` +
-          `--------------------------------\n` +
-          `Sub Total: Rs. ${subtotal}\n` +
-          (gstAmount > 0 ? `GST: Rs. ${gstAmount}\n` : "") +
-          `*Total Rs: Rs. ${grandTotal}*\n` +
-          `--------------------------------\n` +
-          `✨ *Thanks for purchasing!*\n` +
-          `🍨 *Visit Again Soon*\n` +
-          `*Powered by CocoBae*`;
-
-        const whatsappUri = `whatsapp://send?phone=${targetPhone}&text=${encodeURIComponent(whatsappText)}`;
-        Linking.canOpenURL(whatsappUri)
-          .then((canOpen) => {
-            if (canOpen) {
-              Linking.openURL(whatsappUri).catch(() => {});
-            } else {
-              Linking.openURL(
-                `https://wa.me/${targetPhone}?text=${encodeURIComponent(whatsappText)}`,
-              ).catch(() => {});
-            }
-          })
-          .catch(() => {});
+          await shareInvoicePdf(pdfUri, created.order_number);
+        } catch (pdfErr) {
+          console.warn("Could not auto-dispatch PDF invoice:", pdfErr);
+        }
       }
 
       clearCart();

@@ -7,6 +7,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { THEME } from "../theme/tokens";
 import { Order } from "../db/orders";
 import { getSetting } from "../db/settings";
+import { generateInvoicePdf, shareInvoicePdf } from "../lib/pdfInvoice";
 import { formatINR } from "../lib/utils";
 import {
   Printer,
@@ -269,8 +270,8 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
     }
   };
 
-  // Direct 1-tap WhatsApp bill sender
-  const handleSendWhatsApp = () => {
+  // Direct 1-tap WhatsApp PDF bill sender
+  const handleSendWhatsApp = async () => {
     const rawPhone = (order.customer_phone || "").replace(/[^0-9]/g, "");
     if (!rawPhone || rawPhone.length < 10) {
       Alert.alert(
@@ -280,45 +281,18 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
       return;
     }
 
-    const targetPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
-    const itemsList = (order.items || [])
-      .map(
-        (it) => `• ${it.product_name}  ${it.unit_price} x${it.quantity} = ₹${it.subtotal}`,
-      )
-      .join("\n");
-
-    const whatsappText =
-      `🍨 *${cafeName.toUpperCase()}*\n` +
-      `--------------------------------\n` +
-      `🧾 *Receipt: #${order.order_number}*\n` +
-      `📅 *Date:* ${formattedDate}\n` +
-      `👤 *Customer:* ${order.customer_name || "Guest"}\n` +
-      `💳 *Payment:* ${order.payment_method.toUpperCase()} (PAID)\n` +
-      `--------------------------------\n` +
-      `*Items:*\n${itemsList}\n` +
-      `--------------------------------\n` +
-      `Sub Total: Rs. ${(order.total_amount - (order.gst_amount || 0)).toFixed(2)}\n` +
-      (order.gst_amount > 0 ? `GST: Rs. ${order.gst_amount.toFixed(2)}\n` : "") +
-      `*Total Rs: Rs. ${order.total_amount.toFixed(2)}*\n` +
-      `--------------------------------\n` +
-      `✨ *Thanks for purchasing!*\n` +
-      `🍨 *Visit Again Soon*\n` +
-      `*Powered by CocoBae*`;
-
-    const whatsappUri = `whatsapp://send?phone=${targetPhone}&text=${encodeURIComponent(whatsappText)}`;
-    Linking.canOpenURL(whatsappUri)
-      .then((canOpen) => {
-        if (canOpen) {
-          Linking.openURL(whatsappUri).catch(() => {});
-        } else {
-          Linking.openURL(
-            `https://wa.me/${targetPhone}?text=${encodeURIComponent(whatsappText)}`,
-          ).catch(() => {});
-        }
-      })
-      .catch(() => {
-        Alert.alert("Error", "Could not open WhatsApp.");
+    try {
+      const pdfUri = await generateInvoicePdf(order, {
+        cafeName,
+        storePhone,
+        storeCity,
+        upiId,
       });
+
+      await shareInvoicePdf(pdfUri, order.order_number);
+    } catch (err: any) {
+      Alert.alert("WhatsApp Error", err.message || "Could not share PDF invoice.");
+    }
   };
 
   return (
