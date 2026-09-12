@@ -23,14 +23,17 @@ import {
 } from "../../db/reports";
 import { formatINR } from "../../lib/utils";
 import { ReportSkeleton } from "./ReportSkeleton";
+import { DateFilterBar } from "./DateFilterBar";
 
 export interface PaymentReportDetailProps {
   range: DateRange;
+  onRangeChange?: (range: DateRange) => void;
   onBack: () => void;
 }
 
 export const PaymentReportDetail: React.FC<PaymentReportDetailProps> = ({
   range,
+  onRangeChange,
   onBack,
 }) => {
   const [items, setItems] = useState<PaymentReportItem[]>([]);
@@ -138,6 +141,11 @@ export const PaymentReportDetail: React.FC<PaymentReportDetailProps> = ({
           </Text>
         </View>
       </View>
+
+      {/* Date Filter Bar with Custom Date option */}
+      {onRangeChange && (
+        <DateFilterBar currentRange={range} onRangeChange={onRangeChange} />
+      )}
 
       <ScrollView
         showsVerticalScrollIndicator={false}

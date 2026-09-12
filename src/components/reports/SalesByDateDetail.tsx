@@ -22,13 +22,17 @@ import {
 import { formatINR } from "../../lib/utils";
 import { ReportSkeleton } from "./ReportSkeleton";
 
+import { DateFilterBar } from "./DateFilterBar";
+
 export interface SalesByDateDetailProps {
   range: DateRange;
+  onRangeChange?: (range: DateRange) => void;
   onBack: () => void;
 }
 
 export const SalesByDateDetail: React.FC<SalesByDateDetailProps> = ({
   range,
+  onRangeChange,
   onBack,
 }) => {
   const [items, setItems] = useState<SalesByDateItem[]>([]);
@@ -110,6 +114,11 @@ export const SalesByDateDetail: React.FC<SalesByDateDetailProps> = ({
           </Text>
         </View>
       </View>
+
+      {/* Date Filter Bar with Custom Date option */}
+      {onRangeChange && (
+        <DateFilterBar currentRange={range} onRangeChange={onRangeChange} />
+      )}
 
       <ScrollView
         showsVerticalScrollIndicator={false}

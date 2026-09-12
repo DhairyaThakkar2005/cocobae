@@ -122,28 +122,52 @@ export const SalesScreen: React.FC = () => {
 
   // Full-Screen Report Detail Views
   if (activeReport === "sales-by-date") {
-    return <SalesByDateDetail range={range} onBack={() => setActiveReport(null)} />;
+    return (
+      <SalesByDateDetail
+        range={range}
+        onRangeChange={setRange}
+        onBack={() => setActiveReport(null)}
+      />
+    );
   }
 
   if (activeReport === "product-sales") {
-    return <ProductSalesDetail range={range} onBack={() => setActiveReport(null)} />;
+    return (
+      <ProductSalesDetail
+        range={range}
+        onRangeChange={setRange}
+        onBack={() => setActiveReport(null)}
+      />
+    );
   }
 
   if (activeReport === "customer-sales") {
     return (
-      <CustomerSalesDetail range={range} onBack={() => setActiveReport(null)} />
+      <CustomerSalesDetail
+        range={range}
+        onRangeChange={setRange}
+        onBack={() => setActiveReport(null)}
+      />
     );
   }
 
   if (activeReport === "category-sales") {
     return (
-      <CategorySalesDetail range={range} onBack={() => setActiveReport(null)} />
+      <CategorySalesDetail
+        range={range}
+        onRangeChange={setRange}
+        onBack={() => setActiveReport(null)}
+      />
     );
   }
 
   if (activeReport === "payment-report") {
     return (
-      <PaymentReportDetail range={range} onBack={() => setActiveReport(null)} />
+      <PaymentReportDetail
+        range={range}
+        onRangeChange={setRange}
+        onBack={() => setActiveReport(null)}
+      />
     );
   }
 
