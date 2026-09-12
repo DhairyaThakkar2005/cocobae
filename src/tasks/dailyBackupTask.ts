@@ -128,6 +128,27 @@ export async function performDatabaseBackup(
     // Log to DB
     await logBackup(destPath, triggerType, "success");
 
+    // If custom backup directory URI is configured, also copy into user's chosen folder
+    try {
+      const customDirUri = await getSetting("backup_directory_uri", "");
+      if (customDirUri && FileSystem.StorageAccessFramework) {
+        const fileContent = await FileSystem.readAsStringAsync(destPath, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        const createdFileUri =
+          await FileSystem.StorageAccessFramework.createFileAsync(
+            customDirUri,
+            filename,
+            "application/x-sqlite3",
+          );
+        await FileSystem.writeAsStringAsync(createdFileUri, fileContent, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      }
+    } catch (safErr) {
+      console.warn("[BackupTask] SAF custom folder sync notice:", safErr);
+    }
+
     // Trigger local notification
     await sendLocalBackupNotification(filename, destPath);
 
@@ -137,6 +158,61 @@ export async function performDatabaseBackup(
     await logBackup("", triggerType, "failed");
     return { success: false, filename: "", path: "", error: err.message };
   }
+}
+
+export async function requestCustomBackupDirectory(): Promise<{
+  uri: string;
+  name: string;
+} | null> {
+  try {
+    if (FileSystem.StorageAccessFramework) {
+      const permissions =
+        await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+      if (permissions.granted) {
+        const decodedUri = decodeURIComponent(permissions.directoryUri);
+        const folderName =
+          decodedUri.split("/").filter(Boolean).pop()?.replace("primary:", "") ||
+          "Custom Folder";
+        return {
+          uri: permissions.directoryUri,
+          name: folderName,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn("[BackupTask] Directory picker error:", e);
+  }
+  return null;
+}
+
+export async function exportBackupToCustomFolder(
+  sourceUri: string,
+  filename: string,
+): Promise<boolean> {
+  try {
+    if (FileSystem.StorageAccessFramework) {
+      const permissions =
+        await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+      if (permissions.granted) {
+        const fileContent = await FileSystem.readAsStringAsync(sourceUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        const createdFileUri =
+          await FileSystem.StorageAccessFramework.createFileAsync(
+            permissions.directoryUri,
+            filename,
+            "application/x-sqlite3",
+          );
+        await FileSystem.writeAsStringAsync(createdFileUri, fileContent, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        return true;
+      }
+    }
+  } catch (e) {
+    console.warn("[BackupTask] Export to custom folder error:", e);
+  }
+  return false;
 }
 
 export async function getBackupFiles(): Promise<

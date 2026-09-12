@@ -55,6 +55,7 @@ export async function initDatabase() {
       gst_amount REAL DEFAULT 0,
       payment_method TEXT,
       customer_name TEXT,
+      customer_phone TEXT,
       note TEXT,
       status TEXT DEFAULT 'completed'
     );
@@ -80,15 +81,27 @@ export async function initDatabase() {
 
   if (typeof db.execAsync === "function") {
     await db.execAsync(query);
+    try {
+      await db.execAsync("ALTER TABLE orders ADD COLUMN customer_phone TEXT;");
+    } catch {
+      // Column already exists
+    }
   } else if (typeof db.exec === "function") {
     await db.exec([{ sql: query, args: [] }], false);
+    try {
+      await db.exec([{ sql: "ALTER TABLE orders ADD COLUMN customer_phone TEXT;", args: [] }], false);
+    } catch {
+      // Column already exists
+    }
   } else {
     await new Promise((resolve, reject) => {
       db.transaction((tx: any) => {
         tx.executeSql(
           query,
           [],
-          () => resolve(true),
+          () => {
+            tx.executeSql("ALTER TABLE orders ADD COLUMN customer_phone TEXT;", [], () => resolve(true), () => resolve(true));
+          },
           (_: any, err: any) => reject(err),
         );
       });
@@ -131,12 +144,16 @@ async function seedInitialData(db: any) {
     // Default Settings
     const defaultSettings = [
       ["cafe_name", "CocoBae Dessert Café"],
+      ["store_phone", "9876543210"],
+      ["store_city", "Ahmedabad"],
       ["upi_id", "cocobae@upi"],
       ["gst_enabled", "0"],
       ["gst_percent", "5"],
       ["auto_backup_enabled", "1"],
       ["backup_time", "02:00"],
       ["retention_days", "7"],
+      ["backup_directory_uri", ""],
+      ["backup_directory_name", ""],
     ];
 
     for (const [key, val] of defaultSettings) {

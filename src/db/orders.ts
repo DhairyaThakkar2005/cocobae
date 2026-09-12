@@ -18,6 +18,7 @@ export interface Order {
   gst_amount: number;
   payment_method: "cash" | "upi" | "card";
   customer_name?: string;
+  customer_phone?: string;
   note?: string;
   status: string;
   items?: OrderItem[];
@@ -32,8 +33,8 @@ export async function createOrder(
   const orderDate = new Date().toISOString();
 
   const insertOrderSql = `
-    INSERT INTO orders (order_number, order_date, total_amount, gst_amount, payment_method, customer_name, note, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO orders (order_number, order_date, total_amount, gst_amount, payment_method, customer_name, customer_phone, note, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   const orderParams = [
     orderNumber,
@@ -42,6 +43,7 @@ export async function createOrder(
     order.gst_amount || 0,
     order.payment_method,
     order.customer_name || "Guest",
+    order.customer_phone || "",
     order.note || "",
     "completed",
   ];
@@ -103,6 +105,7 @@ export async function createOrder(
     gst_amount: order.gst_amount || 0,
     payment_method: order.payment_method,
     customer_name: order.customer_name,
+    customer_phone: order.customer_phone,
     note: order.note,
     status: "completed",
     items: items.map((i) => ({ ...i, order_id: orderId })),

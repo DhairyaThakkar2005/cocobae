@@ -35,4 +35,10 @@ export {
   AlertCircle,
   Eye,
   Edit3,
+  Camera,
+  Image as ImageIcon,
+  Phone,
+  MessageCircle,
+  Send,
+  FolderOpen,
 } from "lucide-react-native";

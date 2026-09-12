@@ -20,6 +20,7 @@ import {
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
 import { useBreakpoint } from "../theme/breakpoints";
+import Animated, { FadeInDown, Layout } from "react-native-reanimated";
 
 export interface CartScreenProps {
   onBack: () => void;
@@ -161,9 +162,11 @@ export const CartScreen: React.FC<CartScreenProps> = ({
               Selected Desserts ({totalItems})
             </Text>
 
-            {items.map((item) => (
-              <View
+            {items.map((item, idx) => (
+              <Animated.View
                 key={item.product.id}
+                entering={FadeInDown.delay(idx * 40).duration(280).springify()}
+                layout={Layout.springify()}
                 style={{
                   backgroundColor: THEME.colors.surface,
                   borderRadius: THEME.radius.lg,
@@ -259,13 +262,15 @@ export const CartScreen: React.FC<CartScreenProps> = ({
                     <TouchableOpacity
                       onPress={() => updateQuantity(item.product.id, -1)}
                     >
-                      <Minus size={15} color={THEME.colors.textMuted} />
+                      <Minus size={15} color={THEME.colors.primary} />
                     </TouchableOpacity>
                     <Text
                       style={{
                         color: THEME.colors.text,
                         fontSize: 14,
                         fontWeight: "700",
+                        minWidth: 20,
+                        textAlign: "center",
                       }}
                     >
                       {item.quantity}
@@ -287,7 +292,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({
                     {formatINR(item.subtotal)}
                   </Text>
                 </View>
-              </View>
+              </Animated.View>
             ))}
 
             {/* General Order Note */}

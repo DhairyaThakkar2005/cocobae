@@ -7,7 +7,10 @@ import {
   TextInput,
   Alert,
   Switch,
+  Image,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import { THEME } from "../../theme/tokens";
 import {
   getProducts,
@@ -26,6 +29,9 @@ import {
   Search,
   Cake,
   CheckCircle2,
+  Camera,
+  ImageIcon,
+  X,
 } from "../../lib/icons";
 import { Dialog } from "../../components/ui/dialog";
 import { Button } from "../../components/ui/button";
@@ -61,6 +67,81 @@ export const ProductsScreen: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [selectedCategoryFilter, search]);
+
+  const ensureImageDir = async () => {
+    const docDir = (FileSystem as any).documentDirectory || "";
+    const imgDir = `${docDir}product_images/`;
+    const info = await FileSystem.getInfoAsync(imgDir);
+    if (!info.exists) {
+      await FileSystem.makeDirectoryAsync(imgDir, { intermediates: true });
+    }
+    return imgDir;
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          "Permission Required",
+          "Please allow gallery access to select a dessert photo.",
+        );
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]?.uri) {
+        const imgDir = await ensureImageDir();
+        const ext = result.assets[0].uri.split(".").pop() || "jpg";
+        const newFileName = `prod_${Date.now()}.${ext}`;
+        const destUri = `${imgDir}${newFileName}`;
+        await FileSystem.copyAsync({
+          from: result.assets[0].uri,
+          to: destUri,
+        });
+        setFormImagePath(destUri);
+      }
+    } catch (err: any) {
+      Alert.alert("Image Error", err.message || "Could not pick image.");
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          "Permission Required",
+          "Please allow camera access to take a dessert photo.",
+        );
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]?.uri) {
+        const imgDir = await ensureImageDir();
+        const ext = result.assets[0].uri.split(".").pop() || "jpg";
+        const newFileName = `prod_${Date.now()}.${ext}`;
+        const destUri = `${imgDir}${newFileName}`;
+        await FileSystem.copyAsync({
+          from: result.assets[0].uri,
+          to: destUri,
+        });
+        setFormImagePath(destUri);
+      }
+    } catch (err: any) {
+      Alert.alert("Camera Error", err.message || "Could not take photo.");
+    }
+  };
 
   const handleOpenAdd = () => {
     setEditingProduct(null);
@@ -218,6 +299,35 @@ export const ProductsScreen: React.FC = () => {
               justifyContent: "space-between",
             }}
           >
+            {/* Product Thumbnail */}
+            {p.image_path ? (
+              <Image
+                source={{ uri: p.image_path }}
+                style={{
+                  width: 50,
+                  height: 50,
+                  borderRadius: THEME.radius.md,
+                  marginRight: 12,
+                  backgroundColor: THEME.colors.surface2,
+                }}
+                resizeMode="cover"
+              />
+            ) : (
+              <View
+                style={{
+                  width: 50,
+                  height: 50,
+                  borderRadius: THEME.radius.md,
+                  marginRight: 12,
+                  backgroundColor: THEME.colors.surface2,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <Cake size={22} color={THEME.colors.primary} />
+              </View>
+            )}
+
             <View style={{ flex: 1, marginRight: 12 }}>
               <View
                 style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
@@ -403,6 +513,125 @@ export const ProductsScreen: React.FC = () => {
             </TouchableOpacity>
           ))}
         </ScrollView>
+
+        {/* Product Image Picker */}
+        <View style={{ marginBottom: 16 }}>
+          <Text
+            style={{
+              color: THEME.colors.textMuted,
+              fontSize: 13,
+              fontWeight: "500",
+              marginBottom: 8,
+            }}
+          >
+            Dessert Photo
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            {formImagePath ? (
+              <View style={{ position: "relative" }}>
+                <Image
+                  source={{ uri: formImagePath }}
+                  style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: THEME.radius.md,
+                    borderWidth: 1,
+                    borderColor: THEME.colors.primary,
+                  }}
+                  resizeMode="cover"
+                />
+                <TouchableOpacity
+                  onPress={() => setFormImagePath("")}
+                  activeOpacity={0.8}
+                  style={{
+                    position: "absolute",
+                    top: -6,
+                    right: -6,
+                    backgroundColor: THEME.colors.danger,
+                    borderRadius: 12,
+                    width: 22,
+                    height: 22,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <X size={14} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View
+                style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: THEME.radius.md,
+                  borderWidth: 1,
+                  borderColor: THEME.colors.border,
+                  backgroundColor: THEME.colors.surface2,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <ImageIcon size={26} color={THEME.colors.textMuted} />
+              </View>
+            )}
+
+            <View style={{ flex: 1, gap: 8 }}>
+              <TouchableOpacity
+                onPress={handlePickImage}
+                activeOpacity={0.8}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  backgroundColor: THEME.colors.surface2,
+                  paddingVertical: 8,
+                  paddingHorizontal: 12,
+                  borderRadius: THEME.radius.md,
+                  borderWidth: 1,
+                  borderColor: THEME.colors.border,
+                }}
+              >
+                <ImageIcon size={15} color={THEME.colors.primary} />
+                <Text
+                  style={{
+                    color: THEME.colors.text,
+                    fontSize: 12,
+                    fontWeight: "600",
+                  }}
+                >
+                  Choose from Gallery
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleTakePhoto}
+                activeOpacity={0.8}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  backgroundColor: THEME.colors.surface2,
+                  paddingVertical: 8,
+                  paddingHorizontal: 12,
+                  borderRadius: THEME.radius.md,
+                  borderWidth: 1,
+                  borderColor: THEME.colors.border,
+                }}
+              >
+                <Camera size={15} color={THEME.colors.primary} />
+                <Text
+                  style={{
+                    color: THEME.colors.text,
+                    fontSize: 12,
+                    fontWeight: "600",
+                  }}
+                >
+                  Take Photo with Camera
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
 
         {/* Veg Toggle */}
         <View

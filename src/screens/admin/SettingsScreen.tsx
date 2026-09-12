@@ -15,6 +15,8 @@ import {
   performDatabaseBackup,
   getBackupFiles,
   shareBackupFile,
+  requestCustomBackupDirectory,
+  exportBackupToCustomFolder,
 } from "../../tasks/dailyBackupTask";
 import { getBackupLogs, BackupLogEntry } from "../../db/backupLog";
 import {
@@ -28,6 +30,8 @@ import {
   QrCode,
   FileText,
   Layers,
+  FolderOpen,
+  Phone,
 } from "../../lib/icons";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -40,12 +44,16 @@ export const SettingsScreen: React.FC = () => {
 
   // Settings state
   const [cafeName, setCafeName] = useState("CocoBae");
+  const [storePhone, setStorePhone] = useState("919999999999");
+  const [storeCity, setStoreCity] = useState("Anand, Gujarat");
   const [upiId, setUpiId] = useState("cocobae@upi");
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstPercent, setGstPercent] = useState("5");
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(true);
   const [backupTime, setBackupTime] = useState("02:00");
   const [retentionDays, setRetentionDays] = useState("7");
+  const [backupDirUri, setBackupDirUri] = useState<string | null>(null);
+  const [backupDirName, setBackupDirName] = useState<string>("App Internal Storage (CocoBae_Backups)");
 
   // Backup files & logs
   const [backupFiles, setBackupFiles] = useState<any[]>([]);
@@ -60,6 +68,8 @@ export const SettingsScreen: React.FC = () => {
       ]);
 
       if (settings.cafe_name) setCafeName(settings.cafe_name);
+      if (settings.store_phone) setStorePhone(settings.store_phone);
+      if (settings.store_city) setStoreCity(settings.store_city);
       if (settings.upi_id) setUpiId(settings.upi_id);
       if (settings.gst_enabled) setGstEnabled(settings.gst_enabled === "1");
       if (settings.gst_percent) setGstPercent(settings.gst_percent);
@@ -67,6 +77,8 @@ export const SettingsScreen: React.FC = () => {
         setAutoBackupEnabled(settings.auto_backup_enabled === "1");
       if (settings.backup_time) setBackupTime(settings.backup_time);
       if (settings.retention_days) setRetentionDays(settings.retention_days);
+      if (settings.backup_directory_uri) setBackupDirUri(settings.backup_directory_uri);
+      if (settings.backup_directory_name) setBackupDirName(settings.backup_directory_name);
 
       setBackupFiles(files);
       setBackupLogs(logs);
@@ -84,6 +96,8 @@ export const SettingsScreen: React.FC = () => {
     try {
       await Promise.all([
         setSetting("cafe_name", cafeName.trim()),
+        setSetting("store_phone", storePhone.trim()),
+        setSetting("store_city", storeCity.trim()),
         setSetting("upi_id", upiId.trim()),
         setSetting("gst_enabled", gstEnabled ? "1" : "0"),
         setSetting("gst_percent", gstPercent.trim() || "5"),
@@ -91,11 +105,37 @@ export const SettingsScreen: React.FC = () => {
         setSetting("backup_time", backupTime.trim() || "02:00"),
         setSetting("retention_days", retentionDays.trim() || "7"),
       ]);
-      Alert.alert("Saved", "Store and backup settings updated successfully.");
+      Alert.alert("Saved", "Store, billing contact, and backup settings updated successfully.");
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to save settings.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChooseCustomBackupDir = async () => {
+    const selected = await requestCustomBackupDirectory();
+    if (selected) {
+      setBackupDirUri(selected.uri);
+      setBackupDirName(selected.name);
+      Alert.alert("Custom Folder Set", `Future backups will also be saved directly to: ${selected.name}`);
+    }
+  };
+
+  const handleResetBackupDir = async () => {
+    await Promise.all([
+      setSetting("backup_directory_uri", ""),
+      setSetting("backup_directory_name", "App Internal Storage (CocoBae_Backups)"),
+    ]);
+    setBackupDirUri(null);
+    setBackupDirName("App Internal Storage (CocoBae_Backups)");
+    Alert.alert("Reset", "Backup folder reset to internal app storage.");
+  };
+
+  const handleExportToFolder = async (fileUri: string, fileName: string) => {
+    const success = await exportBackupToCustomFolder(fileUri, fileName);
+    if (success) {
+      Alert.alert("Saved Successfully", `Backup ${fileName} was saved to your chosen phone folder.`);
     }
   };
 
@@ -106,7 +146,7 @@ export const SettingsScreen: React.FC = () => {
       if (res.success) {
         Alert.alert(
           "Backup Completed",
-          `Database snapshot saved:\n${res.filename}\n\nYou can share this .db file to another phone to transfer your data.`,
+          `Database snapshot saved:\n${res.filename}\n\nYou can share this .db file to another phone or find it in your phone's chosen folder.`,
         );
         loadSettingsAndBackups();
       } else {
@@ -180,6 +220,41 @@ export const SettingsScreen: React.FC = () => {
           onChangeText={setCafeName}
           placeholder="CocoBae Dessert Café"
         />
+
+        <Input
+          label="Store / Owner Mobile Number (WhatsApp)"
+          value={storePhone}
+          onChangeText={setStorePhone}
+          placeholder="e.g. 919876543210"
+          keyboardType="phone-pad"
+        />
+        <Text
+          style={{
+            color: THEME.colors.textMuted,
+            fontSize: 11,
+            marginTop: -6,
+            marginBottom: 10,
+          }}
+        >
+          Displayed on receipts and used for sending WhatsApp invoices to customers.
+        </Text>
+
+        <Input
+          label="Store City / Location"
+          value={storeCity}
+          onChangeText={setStoreCity}
+          placeholder="e.g. Anand, Gujarat"
+        />
+        <Text
+          style={{
+            color: THEME.colors.textMuted,
+            fontSize: 11,
+            marginTop: -6,
+            marginBottom: 10,
+          }}
+        >
+          Printed directly under café title on the customer receipt.
+        </Text>
 
         <Input
           label="UPI ID (for Customer Payment QR Code)"
@@ -356,6 +431,67 @@ export const SettingsScreen: React.FC = () => {
           </View>
         </View>
 
+        {/* Custom Backup Storage Location (SAF) */}
+        <View
+          style={{
+            backgroundColor: THEME.colors.surface2,
+            borderRadius: THEME.radius.md,
+            padding: 12,
+            marginTop: 10,
+            marginBottom: 10,
+            borderWidth: 1,
+            borderColor: THEME.colors.divider,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
+            <FolderOpen size={16} color={THEME.colors.primary} />
+            <Text style={{ color: THEME.colors.text, fontSize: 13, fontWeight: "700" }}>
+              Custom Phone Backup Location
+            </Text>
+          </View>
+          <Text style={{ color: THEME.colors.textMuted, fontSize: 11, marginBottom: 8, lineHeight: 16 }}>
+            Choose any folder on your phone (like Downloads or Documents) where you can easily find and copy your .db backup files.
+          </Text>
+
+          <View
+            style={{
+              backgroundColor: THEME.colors.bg,
+              padding: 8,
+              borderRadius: THEME.radius.sm,
+              borderWidth: 1,
+              borderColor: THEME.colors.border,
+              marginBottom: 10,
+            }}
+          >
+            <Text style={{ color: THEME.colors.textMuted, fontSize: 10 }}>Current Selected Folder:</Text>
+            <Text style={{ color: THEME.colors.primary, fontSize: 12, fontWeight: "600", marginTop: 2 }}>
+              📁 {backupDirName}
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Button
+              onPress={handleChooseCustomBackupDir}
+              size="sm"
+              variant="outline"
+              icon={<FolderOpen size={14} color={THEME.colors.primary} />}
+              style={{ flex: 1 }}
+            >
+              Choose Folder
+            </Button>
+            {backupDirUri ? (
+              <Button
+                onPress={handleResetBackupDir}
+                size="sm"
+                variant="ghost"
+                style={{ flex: 1 }}
+              >
+                Reset Default
+              </Button>
+            ) : null}
+          </View>
+        </View>
+
         {/* Manual Backup Action Button */}
         <Button
           onPress={handleManualBackup}
@@ -458,18 +594,33 @@ export const SettingsScreen: React.FC = () => {
                     : "Local SQLite DB"}
                 </Text>
               </View>
-              <TouchableOpacity
-                onPress={() => handleShareFile(file.uri)}
-                style={{
-                  backgroundColor: THEME.colors.primaryGlow,
-                  padding: 8,
-                  borderRadius: THEME.radius.md,
-                  borderWidth: 1,
-                  borderColor: THEME.colors.primary,
-                }}
-              >
-                <Share2 size={16} color={THEME.colors.primary} />
-              </TouchableOpacity>
+              <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                <TouchableOpacity
+                  onPress={() => handleExportToFolder(file.uri, file.name)}
+                  style={{
+                    backgroundColor: THEME.colors.surface,
+                    padding: 8,
+                    borderRadius: THEME.radius.md,
+                    borderWidth: 1,
+                    borderColor: THEME.colors.border,
+                  }}
+                >
+                  <FolderOpen size={16} color={THEME.colors.text} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => handleShareFile(file.uri)}
+                  style={{
+                    backgroundColor: THEME.colors.primaryGlow,
+                    padding: 8,
+                    borderRadius: THEME.radius.md,
+                    borderWidth: 1,
+                    borderColor: THEME.colors.primary,
+                  }}
+                >
+                  <Share2 size={16} color={THEME.colors.primary} />
+                </TouchableOpacity>
+              </View>
             </View>
           ))
         )}

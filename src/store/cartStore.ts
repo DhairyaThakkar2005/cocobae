@@ -11,12 +11,14 @@ export interface CartItem {
 interface CartStore {
   items: CartItem[];
   customerName: string;
+  customerPhone: string;
   orderNote: string;
   gstEnabled: boolean;
   gstPercent: number;
 
   setSettings: (gstEnabled: boolean, gstPercent: number) => void;
   setCustomerName: (name: string) => void;
+  setCustomerPhone: (phone: string) => void;
   setOrderNote: (note: string) => void;
 
   addItem: (product: Product, quantity?: number, note?: string) => void;
@@ -35,12 +37,14 @@ interface CartStore {
 export const useCartStore = create<CartStore>((set, get) => ({
   items: [],
   customerName: "",
+  customerPhone: "",
   orderNote: "",
   gstEnabled: false,
   gstPercent: 5,
 
   setSettings: (gstEnabled, gstPercent) => set({ gstEnabled, gstPercent }),
   setCustomerName: (customerName) => set({ customerName }),
+  setCustomerPhone: (customerPhone) => set({ customerPhone }),
   setOrderNote: (orderNote) => set({ orderNote }),
 
   addItem: (product, quantity = 1, note = "") => {
@@ -125,7 +129,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
   },
 
   clearCart: () => {
-    set({ items: [], customerName: "", orderNote: "" });
+    set({ items: [], customerName: "", customerPhone: "", orderNote: "" });
   },
 
   getItemQuantity: (productId) => {

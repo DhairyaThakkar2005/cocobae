@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,10 +7,12 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Linking,
 } from "react-native";
 import { THEME } from "../theme/tokens";
 import { useCartStore } from "../store/cartStore";
 import { createOrder, Order } from "../db/orders";
+import { getSetting } from "../db/settings";
 import { formatINR } from "../lib/utils";
 import {
   ArrowLeft,
@@ -20,6 +22,8 @@ import {
   CheckCircle2,
   Receipt,
   Cake,
+  Phone,
+  MessageCircle,
 } from "../lib/icons";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
@@ -39,6 +43,8 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     items,
     customerName,
     setCustomerName,
+    customerPhone,
+    setCustomerPhone,
     orderNote,
     getTotalItemsCount,
     getSubtotal,
@@ -51,6 +57,11 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     "cash",
   );
   const [loading, setLoading] = useState(false);
+  const [cafeName, setCafeName] = useState("CocoBae Dessert Café");
+
+  useEffect(() => {
+    getSetting("cafe_name", "CocoBae Dessert Café").then(setCafeName);
+  }, []);
 
   const totalItems = getTotalItemsCount();
   const subtotal = getSubtotal();
@@ -72,6 +83,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         gst_amount: gstAmount,
         payment_method: paymentMethod,
         customer_name: customerName.trim() || "Guest",
+        customer_phone: customerPhone.trim() || undefined,
         note: orderNote.trim(),
         status: "completed",
       };
@@ -85,6 +97,47 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       }));
 
       const created = await createOrder(orderPayload, itemsPayload);
+
+      // Automated digital bill delivery via WhatsApp if phone number provided
+      const rawPhone = customerPhone.replace(/[^0-9]/g, "");
+      if (rawPhone.length >= 10) {
+        const targetPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
+        const itemsList = items
+          .map((it) => `• ${it.product.name}  ${it.product.price} x${it.quantity} = ₹${it.subtotal}`)
+          .join("\n");
+
+        const whatsappText =
+          `🍨 *${cafeName.toUpperCase()}*\n` +
+          `--------------------------------\n` +
+          `🧾 *Receipt: #${created.order_number}*\n` +
+          `📅 *Date:* ${new Date().toLocaleDateString("en-IN", { dateStyle: "medium" })}\n` +
+          `👤 *Customer:* ${created.customer_name || "Guest"}\n` +
+          `💳 *Payment:* ${paymentMethod.toUpperCase()} (PAID)\n` +
+          `--------------------------------\n` +
+          `*Items:*\n${itemsList}\n` +
+          `--------------------------------\n` +
+          `Sub Total: Rs. ${subtotal}\n` +
+          (gstAmount > 0 ? `GST: Rs. ${gstAmount}\n` : "") +
+          `*Total Rs: Rs. ${grandTotal}*\n` +
+          `--------------------------------\n` +
+          `✨ *Thanks for purchasing!*\n` +
+          `🍨 *Visit Again Soon*\n` +
+          `*Powered by CocoBae*`;
+
+        const whatsappUri = `whatsapp://send?phone=${targetPhone}&text=${encodeURIComponent(whatsappText)}`;
+        Linking.canOpenURL(whatsappUri)
+          .then((canOpen) => {
+            if (canOpen) {
+              Linking.openURL(whatsappUri).catch(() => {});
+            } else {
+              Linking.openURL(
+                `https://wa.me/${targetPhone}?text=${encodeURIComponent(whatsappText)}`,
+              ).catch(() => {});
+            }
+          })
+          .catch(() => {});
+      }
+
       clearCart();
       onOrderPlaced(created);
     } catch (e: any) {
@@ -205,6 +258,98 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 padding: 12,
               }}
             />
+          </View>
+
+          {/* Customer Mobile Number Field */}
+          <View
+            style={{
+              backgroundColor: THEME.colors.surface,
+              borderRadius: THEME.radius.lg,
+              borderWidth: 1,
+              borderColor: THEME.colors.border,
+              padding: 16,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 4,
+              }}
+            >
+              <Text
+                style={{
+                  color: THEME.colors.text,
+                  fontSize: 15,
+                  fontWeight: "700",
+                }}
+              >
+                Customer Mobile Number (Optional)
+              </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 4,
+                  backgroundColor: "rgba(37, 211, 102, 0.15)",
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 12,
+                }}
+              >
+                <MessageCircle size={12} color="#25D366" />
+                <Text
+                  style={{
+                    color: "#25D366",
+                    fontSize: 10,
+                    fontWeight: "700",
+                  }}
+                >
+                  WhatsApp Bill
+                </Text>
+              </View>
+            </View>
+            <Text
+              style={{
+                color: THEME.colors.textMuted,
+                fontSize: 12,
+                marginBottom: 10,
+              }}
+            >
+              The digital invoice will automatically be sent to their WhatsApp.
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: THEME.colors.surface2,
+                borderRadius: THEME.radius.md,
+                borderWidth: 1,
+                borderColor: THEME.colors.border,
+                paddingHorizontal: 12,
+              }}
+            >
+              <Phone
+                size={16}
+                color={THEME.colors.primary}
+                style={{ marginRight: 8 }}
+              />
+              <TextInput
+                value={customerPhone}
+                onChangeText={setCustomerPhone}
+                placeholder="e.g. 9876543210"
+                placeholderTextColor={THEME.colors.textDisabled}
+                keyboardType="phone-pad"
+                maxLength={13}
+                style={{
+                  flex: 1,
+                  color: THEME.colors.text,
+                  fontSize: 14,
+                  paddingVertical: 12,
+                }}
+              />
+            </View>
           </View>
 
           {/* Payment Method Selector */}
