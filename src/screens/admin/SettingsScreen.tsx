@@ -118,7 +118,17 @@ export const SettingsScreen: React.FC = () => {
     if (selected) {
       setBackupDirUri(selected.uri);
       setBackupDirName(selected.name);
-      Alert.alert("Custom Folder Set", `Future backups will also be saved directly to: ${selected.name}`);
+
+      // Immediately persist to SQLite so cron job & manual backup use it right away
+      await Promise.all([
+        setSetting("backup_directory_uri", selected.uri),
+        setSetting("backup_directory_name", selected.name),
+      ]);
+
+      Alert.alert(
+        "Custom Folder Configured",
+        `All manual and automated 24h cron backups will now automatically save directly to:\n📁 ${selected.name}`,
+      );
     }
   };
 
@@ -144,9 +154,13 @@ export const SettingsScreen: React.FC = () => {
     try {
       const res = await performDatabaseBackup("manual");
       if (res.success) {
+        const destMessage = res.customFolderSaved && res.customFolderName
+          ? `\n\n✅ Saved directly to your chosen folder:\n📁 ${res.customFolderName}`
+          : "";
+
         Alert.alert(
           "Backup Completed",
-          `Database snapshot saved:\n${res.filename}\n\nYou can share this .db file to another phone or find it in your phone's chosen folder.`,
+          `Database snapshot saved:\n${res.filename}${destMessage}\n\nYou can access the .db file directly in your file manager or share it.`,
         );
         loadSettingsAndBackups();
       } else {

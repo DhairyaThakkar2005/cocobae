@@ -5,8 +5,11 @@ import { getSetting } from "../db/settings";
 
 export const BACKUP_TASK_NAME = "COCOBAE_DAILY_BACKUP";
 
-// Safe notification helper that works without crashing Expo Go
-async function sendLocalBackupNotification(filename: string, path: string) {
+async function sendLocalBackupNotification(
+  filename: string,
+  path: string,
+  folderName?: string,
+) {
   try {
     const Notifications = require("expo-notifications");
     Notifications.setNotificationHandler({
@@ -18,10 +21,13 @@ async function sendLocalBackupNotification(filename: string, path: string) {
         shouldShowList: true,
       }),
     });
+    const body = folderName
+      ? `✅ Backup saved to ${folderName}: ${filename}`
+      : `✅ Database backup saved: ${filename}`;
     await Notifications.scheduleNotificationAsync({
       content: {
         title: "🍨 CocoBae Daily Backup",
-        body: `✅ Database backup saved: ${filename}`,
+        body,
         data: { path },
       },
       trigger: null,
@@ -45,10 +51,6 @@ try {
 
       const backupResult = await performDatabaseBackup("auto");
       if (backupResult.success) {
-        await sendLocalBackupNotification(
-          backupResult.filename,
-          backupResult.path,
-        );
         return BackgroundFetch.BackgroundFetchResult.NewData;
       }
       return BackgroundFetch.BackgroundFetchResult.Failed;
@@ -86,6 +88,8 @@ export async function performDatabaseBackup(
   success: boolean;
   filename: string;
   path: string;
+  customFolderSaved?: boolean;
+  customFolderName?: string;
   error?: string;
 }> {
   try {
@@ -129,30 +133,49 @@ export async function performDatabaseBackup(
     await logBackup(destPath, triggerType, "success");
 
     // If custom backup directory URI is configured, also copy into user's chosen folder
+    let customFolderSaved = false;
+    let customFolderName: string | undefined;
+
     try {
       const customDirUri = await getSetting("backup_directory_uri", "");
+      customFolderName = await getSetting("backup_directory_name", "");
+
       if (customDirUri && FileSystem.StorageAccessFramework) {
         const fileContent = await FileSystem.readAsStringAsync(destPath, {
           encoding: FileSystem.EncodingType.Base64,
         });
+
         const createdFileUri =
           await FileSystem.StorageAccessFramework.createFileAsync(
             customDirUri,
             filename,
             "application/x-sqlite3",
           );
+
         await FileSystem.writeAsStringAsync(createdFileUri, fileContent, {
           encoding: FileSystem.EncodingType.Base64,
         });
+
+        customFolderSaved = true;
       }
     } catch (safErr) {
       console.warn("[BackupTask] SAF custom folder sync notice:", safErr);
     }
 
-    // Trigger local notification
-    await sendLocalBackupNotification(filename, destPath);
+    // Trigger local notification (showing custom folder location if saved)
+    await sendLocalBackupNotification(
+      filename,
+      destPath,
+      customFolderSaved ? customFolderName : undefined,
+    );
 
-    return { success: true, filename, path: destPath };
+    return {
+      success: true,
+      filename,
+      path: destPath,
+      customFolderSaved,
+      customFolderName,
+    };
   } catch (err: any) {
     console.error("[BackupTask] Backup failure:", err);
     await logBackup("", triggerType, "failed");

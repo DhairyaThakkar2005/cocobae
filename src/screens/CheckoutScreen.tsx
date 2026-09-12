@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -25,6 +25,8 @@ import {
   Cake,
   Phone,
   MessageCircle,
+  Sparkles,
+  ChevronRight,
 } from "../lib/icons";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
@@ -58,6 +60,10 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     "cash",
   );
   const [loading, setLoading] = useState(false);
+  const [successOrder, setSuccessOrder] = useState<Order | null>(null);
+  const [countdown, setCountdown] = useState(5);
+  const timerRef = useRef<any>(null);
+
   const [storeSettings, setStoreSettings] = useState<{
     cafeName: string;
     storePhone: string;
@@ -69,6 +75,32 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     storeCity: "Anand, Gujarat",
     upiId: "cocobae@upi",
   });
+
+  useEffect(() => {
+    if (!successOrder) return;
+    setCountdown(5);
+    let count = 5;
+    timerRef.current = setInterval(() => {
+      count -= 1;
+      if (count <= 0) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        onOrderPlaced(successOrder);
+      } else {
+        setCountdown(count);
+      }
+    }, 1000);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [successOrder]);
+
+  const handleSkipToReceipt = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (successOrder) {
+      onOrderPlaced(successOrder);
+    }
+  };
 
   useEffect(() => {
     getAllSettings().then((s) => {
@@ -137,7 +169,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       }
 
       clearCart();
-      onOrderPlaced(created);
+      setSuccessOrder(created);
     } catch (e: any) {
       Alert.alert("Order Error", e.message || "Failed to record order.");
     } finally {
@@ -165,6 +197,298 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       icon: CreditCard,
     },
   ];
+
+  // 5-Second Order Placed Celebration Screen
+  if (successOrder) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: THEME.colors.bg,
+          justifyContent: "center",
+          alignItems: "center",
+          padding: 24,
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: THEME.colors.surface,
+            borderRadius: 28,
+            borderWidth: 1.5,
+            borderColor: THEME.colors.primary + "35",
+            padding: 28,
+            alignItems: "center",
+            width: "100%",
+            maxWidth: 420,
+            shadowColor: THEME.colors.primary,
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.18,
+            shadowRadius: 24,
+            elevation: 10,
+          }}
+        >
+          {/* Animated Glow Circle */}
+          <View
+            style={{
+              width: 86,
+              height: 86,
+              borderRadius: 43,
+              backgroundColor: "#10B98118",
+              borderWidth: 2.5,
+              borderColor: "#10B981",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 18,
+            }}
+          >
+            <CheckCircle2 size={48} color="#10B981" />
+          </View>
+
+          {/* Heading */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 6,
+            }}
+          >
+            <Sparkles size={20} color={THEME.colors.primary} />
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: "900",
+                color: THEME.colors.text,
+                letterSpacing: 0.3,
+                textAlign: "center",
+              }}
+            >
+              Order Placed!
+            </Text>
+            <Sparkles size={20} color={THEME.colors.primary} />
+          </View>
+
+          <Text
+            style={{
+              fontSize: 13,
+              color: THEME.colors.textMuted,
+              textAlign: "center",
+              marginBottom: 22,
+            }}
+          >
+            Delicious dessert order recorded with love ✨
+          </Text>
+
+          {/* Order Details Card */}
+          <View
+            style={{
+              backgroundColor: THEME.colors.surface2,
+              borderRadius: 18,
+              borderWidth: 1,
+              borderColor: THEME.colors.border,
+              padding: 16,
+              width: "100%",
+              marginBottom: 20,
+              gap: 12,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                Order Number
+              </Text>
+              <Text
+                style={{
+                  color: THEME.colors.text,
+                  fontSize: 14,
+                  fontWeight: "800",
+                }}
+              >
+                #{successOrder.order_number || String(successOrder.id).padStart(4, "0")}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                Amount Paid
+              </Text>
+              <Text
+                style={{
+                  color: THEME.colors.primary,
+                  fontSize: 20,
+                  fontWeight: "900",
+                }}
+              >
+                {formatINR(successOrder.total_amount)}
+              </Text>
+            </View>
+
+            <Separator />
+
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                Payment Method
+              </Text>
+              <View
+                style={{
+                  backgroundColor: THEME.colors.primary + "20",
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    color: THEME.colors.primary,
+                    fontSize: 12,
+                    fontWeight: "800",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {successOrder.payment_method}
+                </Text>
+              </View>
+            </View>
+
+            {successOrder.customer_name ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                  Customer
+                </Text>
+                <Text
+                  style={{
+                    color: THEME.colors.text,
+                    fontSize: 13,
+                    fontWeight: "700",
+                  }}
+                >
+                  {successOrder.customer_name}
+                </Text>
+              </View>
+            ) : null}
+
+            {successOrder.customer_phone ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                  Phone
+                </Text>
+                <Text
+                  style={{
+                    color: THEME.colors.text,
+                    fontSize: 13,
+                    fontWeight: "600",
+                  }}
+                >
+                  {successOrder.customer_phone}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Countdown & Redirect Info */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              marginBottom: 18,
+            }}
+          >
+            <View
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: THEME.colors.primary + "25",
+                alignItems: "center",
+                justifyContent: "center",
+                borderWidth: 1.5,
+                borderColor: THEME.colors.primary,
+              }}
+            >
+              <Text
+                style={{
+                  color: THEME.colors.primary,
+                  fontSize: 15,
+                  fontWeight: "900",
+                }}
+              >
+                {countdown}
+              </Text>
+            </View>
+            <Text
+              style={{
+                color: THEME.colors.textMuted,
+                fontSize: 13,
+                fontWeight: "600",
+              }}
+            >
+              Opening bill receipt in {countdown}s...
+            </Text>
+          </View>
+
+          {/* Quick Action Button to skip countdown */}
+          <TouchableOpacity
+            onPress={handleSkipToReceipt}
+            activeOpacity={0.8}
+            style={{
+              backgroundColor: THEME.colors.primary,
+              paddingVertical: 14,
+              paddingHorizontal: 20,
+              borderRadius: 14,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              width: "100%",
+            }}
+          >
+            <Receipt size={18} color="#FFFFFF" />
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontWeight: "800",
+                fontSize: 15,
+              }}
+            >
+              View Bill Receipt Now
+            </Text>
+            <ChevronRight size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: THEME.colors.bg }}>
