@@ -41,4 +41,13 @@ export {
   MessageCircle,
   Send,
   FolderOpen,
+  Users,
+  User,
+  Tag,
+  Filter,
+  Award,
+  ArrowUpRight,
+  Wallet,
+  ChevronDown,
+  CalendarRange,
 } from "lucide-react-native";

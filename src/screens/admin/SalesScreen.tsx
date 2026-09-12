@@ -1,553 +1,808 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, ScrollView, ActivityIndicator } from "react-native";
-import { THEME } from "../../theme/tokens";
-import { getSalesReport, SalesReport } from "../../db/sales";
-import { formatINR } from "../../lib/utils";
 import {
-  BarChart3,
-  TrendingUp,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+} from "react-native";
+import { THEME } from "../../theme/tokens";
+import {
   Calendar,
+  Cake,
+  Users,
+  Layers,
+  Wallet,
+  TrendingUp,
+  ChevronRight,
+  Sparkles,
+  ShoppingBag,
+  ArrowUpRight,
   Banknote,
   Smartphone,
   CreditCard,
-  Cake,
-  ShoppingBag,
 } from "../../lib/icons";
-import { Card } from "../../components/ui/card";
 import { useBreakpoint } from "../../theme/breakpoints";
+import { formatINR } from "../../lib/utils";
+import {
+  DateRange,
+  getDateRangeBounds,
+  getReportsSummary,
+  ReportsSummary,
+  getProductSalesReport,
+  ProductSalesItem,
+  getCategorySalesReport,
+  CategorySalesItem,
+  getPaymentReport,
+  PaymentReportItem,
+  getCustomerSalesReport,
+  CustomerSalesItem,
+} from "../../db/reports";
+import { DateFilterBar } from "../../components/reports/DateFilterBar";
+import { ReportSkeleton } from "../../components/reports/ReportSkeleton";
+import { SalesByDateDetail } from "../../components/reports/SalesByDateDetail";
+import { ProductSalesDetail } from "../../components/reports/ProductSalesDetail";
+import { CustomerSalesDetail } from "../../components/reports/CustomerSalesDetail";
+import { CategorySalesDetail } from "../../components/reports/CategorySalesDetail";
+import { PaymentReportDetail } from "../../components/reports/PaymentReportDetail";
+
+export type ActiveReportType =
+  | "sales-by-date"
+  | "product-sales"
+  | "customer-sales"
+  | "category-sales"
+  | "payment-report"
+  | null;
 
 export const SalesScreen: React.FC = () => {
   const { isTablet } = useBreakpoint();
-  const [report, setReport] = useState<SalesReport | null>(null);
+  const [range, setRange] = useState<DateRange>(getDateRangeBounds("today"));
+  const [activeReport, setActiveReport] = useState<ActiveReportType>(null);
+
+  const [summary, setSummary] = useState<ReportsSummary>({
+    totalRevenue: 0,
+    totalOrders: 0,
+    avgOrderValue: 0,
+    totalItemsSold: 0,
+  });
+  const [topProduct, setTopProduct] = useState<ProductSalesItem | null>(null);
+  const [topCategory, setTopCategory] = useState<CategorySalesItem | null>(null);
+  const [categoriesList, setCategoriesList] = useState<CategorySalesItem[]>([]);
+  const [paymentItems, setPaymentItems] = useState<PaymentReportItem[]>([]);
+  const [totalCustomersCount, setTotalCustomersCount] = useState(0);
+
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadData = async () => {
     try {
-      const data = await getSalesReport();
-      setReport(data);
+      const [sum, prods, cats, pays, custs] = await Promise.all([
+        getReportsSummary(range),
+        getProductSalesReport(range),
+        getCategorySalesReport(range),
+        getPaymentReport(range),
+        getCustomerSalesReport(range),
+      ]);
+
+      setSummary(sum);
+      setTopProduct(prods[0] || null);
+      setTopCategory(cats[0] || null);
+      setCategoriesList(cats.slice(0, 3));
+      setPaymentItems(pays.items);
+      setTotalCustomersCount(custs.length);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
+    setLoading(true);
     loadData();
-  }, []);
+  }, [range.startDate, range.endDate, range.preset]);
 
-  if (loading || !report) {
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
+
+  // Full-Screen Report Detail Views
+  if (activeReport === "sales-by-date") {
+    return <SalesByDateDetail range={range} onBack={() => setActiveReport(null)} />;
+  }
+
+  if (activeReport === "product-sales") {
+    return <ProductSalesDetail range={range} onBack={() => setActiveReport(null)} />;
+  }
+
+  if (activeReport === "customer-sales") {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator color={THEME.colors.primary} size="large" />
-      </View>
+      <CustomerSalesDetail range={range} onBack={() => setActiveReport(null)} />
     );
   }
 
-  // Calculate max revenue for proportional bar heights in 7-day chart
-  const maxDailyRevenue = Math.max(
-    ...report.dailyRevenueChart.map((d) => d.revenue),
-    1,
-  );
+  if (activeReport === "category-sales") {
+    return (
+      <CategorySalesDetail range={range} onBack={() => setActiveReport(null)} />
+    );
+  }
+
+  if (activeReport === "payment-report") {
+    return (
+      <PaymentReportDetail range={range} onBack={() => setActiveReport(null)} />
+    );
+  }
 
   return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      style={{ flex: 1, backgroundColor: THEME.colors.bg }}
-      contentContainerStyle={{ padding: 14, paddingBottom: 40 }}
-    >
-      <View style={{ marginBottom: 14 }}>
-        <Text
-          style={{ color: THEME.colors.text, fontSize: 18, fontWeight: "800" }}
-        >
-          Sales & Analytics Dashboard
-        </Text>
-        <Text
-          style={{ color: THEME.colors.textMuted, fontSize: 12, marginTop: 2 }}
-        >
-          Live metrics calculated directly from on-device orders.
-        </Text>
-      </View>
+    <View style={{ flex: 1, backgroundColor: THEME.colors.bg }}>
+      {/* Sticky Custom Date Filter Bar */}
+      <DateFilterBar currentRange={range} onRangeChange={setRange} />
 
-      {/* 3 Metric Cards (Today, Week, Month) */}
-      <View
-        style={{
-          flexDirection: isTablet ? "row" : "column",
-          gap: 10,
-          marginBottom: 16,
-        }}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={THEME.colors.primary}
+          />
+        }
       >
-        {/* Today */}
+        {/* Hub Header */}
+        <View style={{ marginBottom: 14 }}>
+          <Text
+            style={{
+              color: THEME.colors.text,
+              fontSize: 20,
+              fontWeight: "900",
+              letterSpacing: 0.2,
+            }}
+          >
+            CocoBae Reports & Analytics
+          </Text>
+          <Text
+            style={{
+              color: THEME.colors.textMuted,
+              fontSize: 12,
+              marginTop: 2,
+            }}
+          >
+            Tap any report to view deep analytics, charts, and transaction lists.
+          </Text>
+        </View>
+
+        {/* Top Summary Banner */}
         <View
           style={{
-            flex: 1,
             backgroundColor: THEME.colors.surface,
+            borderRadius: THEME.radius.lg,
+            borderWidth: 1,
             borderColor: THEME.colors.borderStrong,
-            borderWidth: 1,
-            borderRadius: THEME.radius.lg,
-            padding: 16,
+            padding: 18,
+            marginBottom: 20,
           }}
         >
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: 6,
-              marginBottom: 4,
+              justifyContent: "space-between",
+              marginBottom: 6,
             }}
           >
-            <TrendingUp size={16} color={THEME.colors.primary} />
-            <Text
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <TrendingUp size={16} color={THEME.colors.primary} />
+              <Text
+                style={{
+                  color: THEME.colors.primary,
+                  fontSize: 12,
+                  fontWeight: "800",
+                  letterSpacing: 0.5,
+                }}
+              >
+                TOTAL REVENUE ({range.label.toUpperCase()})
+              </Text>
+            </View>
+            <View
               style={{
-                color: THEME.colors.primary,
-                fontSize: 12,
-                fontWeight: "700",
+                backgroundColor: THEME.colors.primaryGlow,
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 6,
               }}
             >
-              TODAY'S SALES
-            </Text>
+              <Text
+                style={{
+                  color: THEME.colors.primary,
+                  fontSize: 10,
+                  fontWeight: "800",
+                }}
+              >
+                LIVE METRICS
+              </Text>
+            </View>
           </View>
+
           <Text
             style={{
               color: THEME.colors.text,
-              fontSize: 24,
+              fontSize: 30,
               fontWeight: "900",
+              marginVertical: 4,
             }}
           >
-            {formatINR(report.todayRevenue)}
+            {formatINR(summary.totalRevenue)}
           </Text>
-          <Text
-            style={{
-              color: THEME.colors.textMuted,
-              fontSize: 12,
-              marginTop: 2,
-            }}
-          >
-            {report.todayOrdersCount} orders today
-          </Text>
-        </View>
 
-        {/* This Week */}
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: THEME.colors.surface,
-            borderColor: THEME.colors.border,
-            borderWidth: 1,
-            borderRadius: THEME.radius.lg,
-            padding: 16,
-          }}
-        >
+          {/* Quick Metrics 3-Col */}
           <View
             style={{
               flexDirection: "row",
-              alignItems: "center",
-              gap: 6,
-              marginBottom: 4,
+              backgroundColor: THEME.colors.surface2,
+              borderRadius: THEME.radius.md,
+              marginTop: 10,
+              padding: 12,
             }}
           >
-            <Calendar size={16} color={THEME.colors.secondary} />
-            <Text
-              style={{
-                color: THEME.colors.secondary,
-                fontSize: 12,
-                fontWeight: "700",
-              }}
-            >
-              LAST 7 DAYS
-            </Text>
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <Text style={{ color: THEME.colors.textMuted, fontSize: 11, fontWeight: "600" }}>
+                Total Orders
+              </Text>
+              <Text style={{ color: THEME.colors.text, fontSize: 16, fontWeight: "800", marginTop: 2 }}>
+                {summary.totalOrders}
+              </Text>
+            </View>
+            <View style={{ width: 1, backgroundColor: THEME.colors.border }} />
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <Text style={{ color: THEME.colors.textMuted, fontSize: 11, fontWeight: "600" }}>
+                Avg Order Value
+              </Text>
+              <Text style={{ color: THEME.colors.primary, fontSize: 16, fontWeight: "800", marginTop: 2 }}>
+                {formatINR(summary.avgOrderValue)}
+              </Text>
+            </View>
+            <View style={{ width: 1, backgroundColor: THEME.colors.border }} />
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <Text style={{ color: THEME.colors.textMuted, fontSize: 11, fontWeight: "600" }}>
+                Items Sold
+              </Text>
+              <Text style={{ color: THEME.colors.text, fontSize: 16, fontWeight: "800", marginTop: 2 }}>
+                {summary.totalItemsSold}
+              </Text>
+            </View>
           </View>
-          <Text
-            style={{
-              color: THEME.colors.text,
-              fontSize: 24,
-              fontWeight: "900",
-            }}
-          >
-            {formatINR(report.weekRevenue)}
-          </Text>
-          <Text
-            style={{
-              color: THEME.colors.textMuted,
-              fontSize: 12,
-              marginTop: 2,
-            }}
-          >
-            {report.weekOrdersCount} orders
-          </Text>
         </View>
 
-        {/* This Month */}
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: THEME.colors.surface,
-            borderColor: THEME.colors.border,
-            borderWidth: 1,
-            borderRadius: THEME.radius.lg,
-            padding: 16,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 6,
-              marginBottom: 4,
-            }}
-          >
-            <ShoppingBag size={16} color={THEME.colors.success} />
-            <Text
-              style={{
-                color: THEME.colors.success,
-                fontSize: 12,
-                fontWeight: "700",
-              }}
-            >
-              LAST 30 DAYS
-            </Text>
-          </View>
-          <Text
-            style={{
-              color: THEME.colors.text,
-              fontSize: 24,
-              fontWeight: "900",
-            }}
-          >
-            {formatINR(report.monthRevenue)}
-          </Text>
-          <Text
-            style={{
-              color: THEME.colors.textMuted,
-              fontSize: 12,
-              marginTop: 2,
-            }}
-          >
-            {report.monthOrdersCount} orders
-          </Text>
-        </View>
-      </View>
-
-      {/* 7-Day Revenue Visual Bar Chart */}
-      <View
-        style={{
-          backgroundColor: THEME.colors.surface,
-          borderRadius: THEME.radius.lg,
-          borderWidth: 1,
-          borderColor: THEME.colors.border,
-          padding: 16,
-          marginBottom: 16,
-        }}
-      >
+        {/* Reports Section Header */}
         <Text
           style={{
             color: THEME.colors.text,
-            fontSize: 15,
-            fontWeight: "700",
-            marginBottom: 4,
+            fontSize: 16,
+            fontWeight: "800",
+            marginBottom: 12,
           }}
         >
-          Weekly Sales Trend
-        </Text>
-        <Text
-          style={{
-            color: THEME.colors.textMuted,
-            fontSize: 11,
-            marginBottom: 16,
-          }}
-        >
-          Daily revenue breakdown for the past 7 days
+          Detailed Reports (5)
         </Text>
 
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "flex-end",
-            justifyContent: "space-between",
-            height: 120,
-            paddingTop: 10,
-          }}
-        >
-          {report.dailyRevenueChart.map((d, i) => {
-            const heightPercent = Math.max(
-              8,
-              (d.revenue / maxDailyRevenue) * 100,
-            );
-            return (
-              <View key={i} style={{ alignItems: "center", flex: 1 }}>
-                <Text
-                  style={{
-                    color: THEME.colors.primary,
-                    fontSize: 9,
-                    fontWeight: "700",
-                    marginBottom: 4,
-                  }}
-                >
-                  {d.revenue > 0 ? `₹${d.revenue}` : ""}
-                </Text>
-                <View
-                  style={{
-                    width: "60%",
-                    height: `${heightPercent}%`,
-                    backgroundColor:
-                      d.revenue > 0
-                        ? THEME.colors.primary
-                        : THEME.colors.surface2,
-                    borderRadius: 4,
-                  }}
-                />
-                <Text
-                  style={{
-                    color: THEME.colors.textMuted,
-                    fontSize: 10,
-                    fontWeight: "600",
-                    marginTop: 6,
-                  }}
-                >
-                  {d.day}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* Top Selling Items & Payment Methods Split */}
-      <View
-        style={{
-          flexDirection: isTablet ? "row" : "column",
-          gap: 16,
-        }}
-      >
-        {/* Top Selling Desserts */}
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: THEME.colors.surface,
-            borderRadius: THEME.radius.lg,
-            borderWidth: 1,
-            borderColor: THEME.colors.border,
-            padding: 16,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 6,
-              marginBottom: 12,
-            }}
-          >
-            <Cake size={18} color={THEME.colors.primary} />
-            <Text
+        {loading ? (
+          <ReportSkeleton rows={5} />
+        ) : (
+          <View style={{ gap: 14 }}>
+            {/* 1. Sales by Date Card */}
+            <TouchableOpacity
+              onPress={() => setActiveReport("sales-by-date")}
+              activeOpacity={0.8}
               style={{
-                color: THEME.colors.text,
-                fontSize: 15,
-                fontWeight: "700",
+                backgroundColor: THEME.colors.surface,
+                borderRadius: THEME.radius.lg,
+                borderWidth: 1,
+                borderColor: THEME.colors.border,
+                padding: 16,
+                gap: 12,
               }}
             >
-              Top Selling Desserts
-            </Text>
-          </View>
-
-          {report.topSellingItems.length === 0 ? (
-            <Text style={{ color: THEME.colors.textMuted, fontSize: 12 }}>
-              No sales data recorded yet.
-            </Text>
-          ) : (
-            report.topSellingItems.map((item, idx) => (
               <View
-                key={idx}
                 style={{
                   flexDirection: "row",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  paddingVertical: 8,
-                  borderBottomWidth:
-                    idx < report.topSellingItems.length - 1 ? 1 : 0,
-                  borderBottomColor: THEME.colors.divider,
                 }}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 8,
-                    flex: 1,
-                  }}
-                >
-                  <Text
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <View
                     style={{
-                      color: THEME.colors.primary,
-                      fontWeight: "800",
-                      fontSize: 13,
+                      width: 44,
+                      height: 44,
+                      borderRadius: 14,
+                      backgroundColor: THEME.colors.primaryGlow,
+                      borderWidth: 1,
+                      borderColor: THEME.colors.primary,
+                      alignItems: "center",
+                      justifyContent: "center",
                     }}
                   >
-                    #{idx + 1}
-                  </Text>
+                    <Calendar size={22} color={THEME.colors.primary} />
+                  </View>
                   <View>
                     <Text
-                      numberOfLines={1}
                       style={{
                         color: THEME.colors.text,
-                        fontSize: 13,
-                        fontWeight: "600",
+                        fontSize: 16,
+                        fontWeight: "800",
                       }}
                     >
-                      {item.product_name}
+                      Sales by Date
                     </Text>
                     <Text
-                      style={{ color: THEME.colors.textMuted, fontSize: 11 }}
+                      style={{
+                        color: THEME.colors.textMuted,
+                        fontSize: 12,
+                        fontWeight: "500",
+                        marginTop: 2,
+                      }}
                     >
-                      {item.total_qty} units sold
+                      Daily revenue, orders count & average order value
                     </Text>
                   </View>
                 </View>
+
+                <ChevronRight size={18} color={THEME.colors.primary} />
+              </View>
+
+              {/* Snapshot Row */}
+              <View
+                style={{
+                  backgroundColor: THEME.colors.surface2,
+                  borderRadius: THEME.radius.md,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 12 }}>
+                  Period Volume:{" "}
+                  <Text style={{ color: THEME.colors.text, fontWeight: "700" }}>
+                    {summary.totalOrders} orders
+                  </Text>
+                </Text>
                 <Text
                   style={{
-                    color: THEME.colors.text,
-                    fontSize: 13,
-                    fontWeight: "700",
+                    color: THEME.colors.primary,
+                    fontSize: 15,
+                    fontWeight: "800",
                   }}
                 >
-                  {formatINR(item.total_sales)}
+                  {formatINR(summary.totalRevenue)}
                 </Text>
               </View>
-            ))
-          )}
-        </View>
+            </TouchableOpacity>
 
-        {/* Payment Split */}
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: THEME.colors.surface,
-            borderRadius: THEME.radius.lg,
-            borderWidth: 1,
-            borderColor: THEME.colors.border,
-            padding: 16,
-          }}
-        >
-          <Text
-            style={{
-              color: THEME.colors.text,
-              fontSize: 15,
-              fontWeight: "700",
-              marginBottom: 12,
-            }}
-          >
-            Revenue by Payment Method
-          </Text>
-
-          <View style={{ gap: 10 }}>
-            {/* Cash */}
-            <View
+            {/* 2. Product Sales Card */}
+            <TouchableOpacity
+              onPress={() => setActiveReport("product-sales")}
+              activeOpacity={0.8}
               style={{
-                backgroundColor: THEME.colors.surface2,
-                borderRadius: THEME.radius.md,
-                padding: 12,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
+                backgroundColor: THEME.colors.surface,
+                borderRadius: THEME.radius.lg,
+                borderWidth: 1,
+                borderColor: THEME.colors.border,
+                padding: 16,
+                gap: 12,
               }}
             >
               <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-              >
-                <Banknote size={18} color={THEME.colors.success} />
-                <Text
-                  style={{
-                    color: THEME.colors.text,
-                    fontSize: 13,
-                    fontWeight: "600",
-                  }}
-                >
-                  Cash
-                </Text>
-              </View>
-              <Text
                 style={{
-                  color: THEME.colors.text,
-                  fontSize: 14,
-                  fontWeight: "800",
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                 }}
               >
-                {formatINR(report.paymentSplit.cash)}
-              </Text>
-            </View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 14,
+                      backgroundColor: "rgba(232, 131, 106, 0.18)",
+                      borderWidth: 1,
+                      borderColor: THEME.colors.secondary,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Cake size={22} color={THEME.colors.secondary} />
+                  </View>
+                  <View>
+                    <Text
+                      style={{
+                        color: THEME.colors.text,
+                        fontSize: 16,
+                        fontWeight: "800",
+                      }}
+                    >
+                      Product Sales & Rankings
+                    </Text>
+                    <Text
+                      style={{
+                        color: THEME.colors.textMuted,
+                        fontSize: 12,
+                        fontWeight: "500",
+                        marginTop: 2,
+                      }}
+                    >
+                      Searchable dessert sales, units sold & ranking
+                    </Text>
+                  </View>
+                </View>
 
-            {/* UPI */}
-            <View
+                <ChevronRight size={18} color={THEME.colors.primary} />
+              </View>
+
+              {/* Snapshot Row */}
+              <View
+                style={{
+                  backgroundColor: THEME.colors.surface2,
+                  borderRadius: THEME.radius.md,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: THEME.colors.textMuted,
+                    fontSize: 12,
+                    flex: 1,
+                    marginRight: 8,
+                  }}
+                  numberOfLines={1}
+                >
+                  Top Seller:{" "}
+                  <Text style={{ color: THEME.colors.text, fontWeight: "700" }}>
+                    {topProduct ? topProduct.productName : "None"}
+                  </Text>
+                </Text>
+                <Text
+                  style={{
+                    color: THEME.colors.primary,
+                    fontSize: 14,
+                    fontWeight: "800",
+                  }}
+                >
+                  {topProduct ? `${topProduct.unitsSold} sold` : "0 sold"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* 3. Customer Sales Card */}
+            <TouchableOpacity
+              onPress={() => setActiveReport("customer-sales")}
+              activeOpacity={0.8}
               style={{
-                backgroundColor: THEME.colors.surface2,
-                borderRadius: THEME.radius.md,
-                padding: 12,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
+                backgroundColor: THEME.colors.surface,
+                borderRadius: THEME.radius.lg,
+                borderWidth: 1,
+                borderColor: THEME.colors.border,
+                padding: 16,
+                gap: 12,
               }}
             >
               <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-              >
-                <Smartphone size={18} color={THEME.colors.primary} />
-                <Text
-                  style={{
-                    color: THEME.colors.text,
-                    fontSize: 13,
-                    fontWeight: "600",
-                  }}
-                >
-                  UPI / QR
-                </Text>
-              </View>
-              <Text
                 style={{
-                  color: THEME.colors.text,
-                  fontSize: 14,
-                  fontWeight: "800",
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                 }}
               >
-                {formatINR(report.paymentSplit.upi)}
-              </Text>
-            </View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 14,
+                      backgroundColor: "rgba(76, 175, 125, 0.18)",
+                      borderWidth: 1,
+                      borderColor: THEME.colors.success,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Users size={22} color={THEME.colors.success} />
+                  </View>
+                  <View>
+                    <Text
+                      style={{
+                        color: THEME.colors.text,
+                        fontSize: 16,
+                        fontWeight: "800",
+                      }}
+                    >
+                      Customer Sales & History
+                    </Text>
+                    <Text
+                      style={{
+                        color: THEME.colors.textMuted,
+                        fontSize: 12,
+                        fontWeight: "500",
+                        marginTop: 2,
+                      }}
+                    >
+                      Search by name or mobile, total orders & spend
+                    </Text>
+                  </View>
+                </View>
 
-            {/* Card */}
-            <View
+                <ChevronRight size={18} color={THEME.colors.primary} />
+              </View>
+
+              {/* Snapshot Row */}
+              <View
+                style={{
+                  backgroundColor: THEME.colors.surface2,
+                  borderRadius: THEME.radius.md,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 12 }}>
+                  Active Customers:{" "}
+                  <Text style={{ color: THEME.colors.text, fontWeight: "700" }}>
+                    {totalCustomersCount} guests
+                  </Text>
+                </Text>
+                <Text
+                  style={{
+                    color: THEME.colors.primary,
+                    fontSize: 14,
+                    fontWeight: "800",
+                  }}
+                >
+                  View Details →
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* 4. Category Sales Card */}
+            <TouchableOpacity
+              onPress={() => setActiveReport("category-sales")}
+              activeOpacity={0.8}
               style={{
-                backgroundColor: THEME.colors.surface2,
-                borderRadius: THEME.radius.md,
-                padding: 12,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
+                backgroundColor: THEME.colors.surface,
+                borderRadius: THEME.radius.lg,
+                borderWidth: 1,
+                borderColor: THEME.colors.border,
+                padding: 16,
+                gap: 12,
               }}
             >
               <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-              >
-                <CreditCard size={18} color={THEME.colors.secondary} />
-                <Text
-                  style={{
-                    color: THEME.colors.text,
-                    fontSize: 13,
-                    fontWeight: "600",
-                  }}
-                >
-                  Card / POS
-                </Text>
-              </View>
-              <Text
                 style={{
-                  color: THEME.colors.text,
-                  fontSize: 14,
-                  fontWeight: "800",
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                 }}
               >
-                {formatINR(report.paymentSplit.card)}
-              </Text>
-            </View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 14,
+                      backgroundColor: "rgba(161, 140, 209, 0.18)",
+                      borderWidth: 1,
+                      borderColor: "#A18CD1",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Layers size={22} color="#A18CD1" />
+                  </View>
+                  <View>
+                    <Text
+                      style={{
+                        color: THEME.colors.text,
+                        fontSize: 16,
+                        fontWeight: "800",
+                      }}
+                    >
+                      Category Sales Comparison
+                    </Text>
+                    <Text
+                      style={{
+                        color: THEME.colors.textMuted,
+                        fontSize: 12,
+                        fontWeight: "500",
+                        marginTop: 2,
+                      }}
+                    >
+                      Compare dessert performance with progress bars
+                    </Text>
+                  </View>
+                </View>
+
+                <ChevronRight size={18} color={THEME.colors.primary} />
+              </View>
+
+              {/* Progress bars preview */}
+              {categoriesList.length > 0 ? (
+                <View style={{ gap: 6 }}>
+                  {categoriesList.map((c) => (
+                    <View key={c.categoryName} style={{ gap: 3 }}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: THEME.colors.text,
+                            fontSize: 11,
+                            fontWeight: "600",
+                          }}
+                        >
+                          {c.emoji} {c.categoryName}
+                        </Text>
+                        <Text
+                          style={{
+                            color: THEME.colors.textMuted,
+                            fontSize: 11,
+                            fontWeight: "700",
+                          }}
+                        >
+                          {formatINR(c.totalRevenue)} ({c.percentage}%)
+                        </Text>
+                      </View>
+                      <View
+                        style={{
+                          height: 4,
+                          borderRadius: 2,
+                          backgroundColor: THEME.colors.surface2,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <View
+                          style={{
+                            height: "100%",
+                            width: `${Math.min(Math.max(c.percentage, 4), 100)}%`,
+                            backgroundColor: THEME.colors.primary,
+                            borderRadius: 2,
+                          }}
+                        />
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View
+                  style={{
+                    backgroundColor: THEME.colors.surface2,
+                    borderRadius: THEME.radius.md,
+                    padding: 10,
+                  }}
+                >
+                  <Text style={{ color: THEME.colors.textMuted, fontSize: 12 }}>
+                    No category sales recorded yet
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* 5. Payment Report Card */}
+            <TouchableOpacity
+              onPress={() => setActiveReport("payment-report")}
+              activeOpacity={0.8}
+              style={{
+                backgroundColor: THEME.colors.surface,
+                borderRadius: THEME.radius.lg,
+                borderWidth: 1,
+                borderColor: THEME.colors.border,
+                padding: 16,
+                gap: 12,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 14,
+                      backgroundColor: THEME.colors.primaryGlow,
+                      borderWidth: 1,
+                      borderColor: THEME.colors.primary,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Wallet size={22} color={THEME.colors.primary} />
+                  </View>
+                  <View>
+                    <Text
+                      style={{
+                        color: THEME.colors.text,
+                        fontSize: 16,
+                        fontWeight: "800",
+                      }}
+                    >
+                      Payment Channels Report
+                    </Text>
+                    <Text
+                      style={{
+                        color: THEME.colors.textMuted,
+                        fontSize: 12,
+                        fontWeight: "500",
+                        marginTop: 2,
+                      }}
+                    >
+                      Cash, UPI/QR, and Card/POS collections
+                    </Text>
+                  </View>
+                </View>
+
+                <ChevronRight size={18} color={THEME.colors.primary} />
+              </View>
+
+              {/* Payment Split Chips */}
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {paymentItems.map((p) => (
+                  <View
+                    key={p.method}
+                    style={{
+                      flex: 1,
+                      backgroundColor: THEME.colors.surface2,
+                      borderRadius: THEME.radius.md,
+                      padding: 10,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: THEME.colors.textMuted,
+                        fontSize: 11,
+                        fontWeight: "600",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {p.method}
+                    </Text>
+                    <Text
+                      style={{
+                        color:
+                          p.method === "cash"
+                            ? "#10B981"
+                            : p.method === "upi"
+                              ? THEME.colors.primary
+                              : THEME.colors.secondary,
+                        fontSize: 13,
+                        fontWeight: "800",
+                        marginTop: 2,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {formatINR(p.totalCollected)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </TouchableOpacity>
           </View>
-        </View>
-      </View>
-    </ScrollView>
+        )}
+      </ScrollView>
+    </View>
   );
 };
