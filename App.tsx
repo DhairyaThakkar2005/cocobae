@@ -39,44 +39,6 @@ export default function App() {
     prepareApp();
   }, []);
 
-  if (!appReady) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: THEME.colors.bg,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <StatusBar barStyle="light-content" backgroundColor={THEME.colors.bg} />
-        <ActivityIndicator color={THEME.colors.primary} size="large" />
-        <Text
-          style={{
-            color: THEME.colors.primary,
-            fontSize: 22,
-            fontWeight: "900",
-            marginTop: 16,
-            letterSpacing: 1,
-          }}
-        >
-          CocoBae
-        </Text>
-        <Text
-          style={{
-            color: THEME.colors.textMuted,
-            fontSize: 12,
-            marginTop: 4,
-            letterSpacing: 2,
-            textTransform: "uppercase",
-          }}
-        >
-          Dessert Café POS
-        </Text>
-      </View>
-    );
-  }
-
   const [screenStack, setScreenStack] = useState<AppScreen[]>(["home"]);
   const lastBackPressTime = useRef(0);
 
@@ -139,6 +101,44 @@ export default function App() {
     setCurrentScreen("home");
     setScreenStack(["home"]);
   };
+
+  if (!appReady) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: THEME.colors.bg,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <StatusBar barStyle="light-content" backgroundColor={THEME.colors.bg} />
+        <ActivityIndicator color={THEME.colors.primary} size="large" />
+        <Text
+          style={{
+            color: THEME.colors.primary,
+            fontSize: 22,
+            fontWeight: "900",
+            marginTop: 16,
+            letterSpacing: 1,
+          }}
+        >
+          CocoBae
+        </Text>
+        <Text
+          style={{
+            color: THEME.colors.textMuted,
+            fontSize: 12,
+            marginTop: 4,
+            letterSpacing: 2,
+            textTransform: "uppercase",
+          }}
+        >
+          Dessert Café POS
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaProvider>
