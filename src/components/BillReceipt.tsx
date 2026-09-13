@@ -8,7 +8,6 @@ import { THEME } from "../theme/tokens";
 import { Order } from "../db/orders";
 import { getSetting } from "../db/settings";
 import { generateInvoicePdf, shareInvoicePdf } from "../lib/pdfInvoice";
-import { openDirectCustomerWhatsApp } from "../lib/whatsapp";
 import { formatINR } from "../lib/utils";
 import {
   Printer,
@@ -16,7 +15,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   QrCode,
-  MessageCircle,
   Phone,
 } from "../lib/icons";
 import { Separator } from "./ui/separator";
@@ -271,23 +269,6 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
     }
   };
 
-  // Direct 1-tap WhatsApp chat opener with positive receipt message
-  const handleSendWhatsApp = async () => {
-    const rawPhone = (order.customer_phone || "").replace(/[^0-9]/g, "");
-    if (!rawPhone || rawPhone.length < 10) {
-      Alert.alert(
-        "No Phone Number",
-        "This order does not have a customer mobile number recorded.",
-      );
-      return;
-    }
-
-    await openDirectCustomerWhatsApp(rawPhone, order, {
-      cafeName,
-      storePhone,
-      storeCity,
-    });
-  };
 
   return (
     <ScrollView
@@ -400,9 +381,9 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
               </Text>
               <Text
                 style={{
-                  color: "#25D366",
+                  color: THEME.colors.text,
                   fontSize: 12,
-                  fontWeight: "700",
+                  fontWeight: "600",
                 }}
               >
                 +91 {order.customer_phone}
@@ -646,42 +627,6 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
 
         {/* Action Buttons */}
         <View style={{ gap: 8 }}>
-          {/* Send via WhatsApp Button */}
-          {order.customer_phone ? (
-            <TouchableOpacity
-              onPress={handleSendWhatsApp}
-              activeOpacity={0.8}
-              style={{
-                backgroundColor: "#25D366",
-                borderRadius: THEME.radius.md,
-                paddingVertical: 12,
-                paddingHorizontal: 14,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-                width: "100%",
-              }}
-            >
-              <View style={{ flexShrink: 0 }}>
-                <MessageCircle size={18} color="#FFFFFF" />
-              </View>
-              <Text
-                numberOfLines={1}
-                ellipsizeMode="tail"
-                style={{
-                  color: "#FFFFFF",
-                  fontSize: 14,
-                  fontWeight: "800",
-                  flexShrink: 1,
-                  textAlign: "center",
-                }}
-              >
-                Send Bill via WhatsApp (+91 {order.customer_phone})
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-
           <View style={{ flexDirection: isTablet ? "row" : "column", gap: 8 }}>
             <Button
               onPress={handlePrint}

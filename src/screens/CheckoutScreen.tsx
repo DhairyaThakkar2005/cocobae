@@ -14,7 +14,6 @@ import { useCartStore } from "../store/cartStore";
 import { createOrder, Order } from "../db/orders";
 import { getAllSettings } from "../db/settings";
 import { generateInvoicePdf, shareInvoicePdf } from "../lib/pdfInvoice";
-import { openDirectCustomerWhatsApp } from "../lib/whatsapp";
 import { formatINR } from "../lib/utils";
 import {
   ArrowLeft,
@@ -25,7 +24,6 @@ import {
   Receipt,
   Cake,
   Phone,
-  MessageCircle,
   Sparkles,
   ChevronRight,
 } from "../lib/icons";
@@ -149,22 +147,8 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
 
       const created = await createOrder(orderPayload, itemsPayload);
 
-      // Attach order items to created object for PDF generator
+      // Attach order items to created object
       created.items = itemsPayload;
-
-      // Automated digital bill delivery via WhatsApp directly to customer chat
-      const rawPhone = customerPhone.replace(/[^0-9]/g, "");
-      if (rawPhone.length >= 10) {
-        try {
-          await openDirectCustomerWhatsApp(rawPhone, created, {
-            cafeName: storeSettings.cafeName,
-            storePhone: storeSettings.storePhone,
-            storeCity: storeSettings.storeCity,
-          });
-        } catch (whatsAppErr) {
-          console.warn("Could not auto-dispatch WhatsApp message:", whatsAppErr);
-        }
-      }
 
       clearCart();
       setSuccessOrder(created);
@@ -590,52 +574,16 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
               padding: 16,
             }}
           >
-            <View
+            <Text
               style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: 8,
-                marginBottom: 6,
+                color: THEME.colors.text,
+                fontSize: 15,
+                fontWeight: "700",
+                marginBottom: 4,
               }}
             >
-              <Text
-                style={{
-                  color: THEME.colors.text,
-                  fontSize: 15,
-                  fontWeight: "700",
-                  flexShrink: 1,
-                }}
-              >
-                Customer Mobile Number (Optional)
-              </Text>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 4,
-                  backgroundColor: "rgba(37, 211, 102, 0.15)",
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                  borderRadius: THEME.radius.full,
-                  borderWidth: 1,
-                  borderColor: "rgba(37, 211, 102, 0.3)",
-                  alignSelf: "flex-start",
-                }}
-              >
-                <MessageCircle size={12} color="#25D366" />
-                <Text
-                  style={{
-                    color: "#25D366",
-                    fontSize: 10,
-                    fontWeight: "700",
-                  }}
-                >
-                  WhatsApp Bill
-                </Text>
-              </View>
-            </View>
+              Customer Mobile Number (Optional)
+            </Text>
             <Text
               style={{
                 color: THEME.colors.textMuted,
@@ -643,7 +591,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 marginBottom: 10,
               }}
             >
-              The digital invoice will automatically be sent to their WhatsApp.
+              Saved with order for customer history & billing records.
             </Text>
             <View
               style={{
