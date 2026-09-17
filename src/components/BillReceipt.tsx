@@ -77,81 +77,124 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
       const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(upiUri)}`;
 
       const html = `
+        <!DOCTYPE html>
         <html>
           <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-              body { font-family: 'Courier New', monospace; padding: 15px; color: #000; font-size: 13px; margin: 0; }
-              .center { text-align: center; }
-              .bold { font-weight: bold; }
-              .divider { border-top: 1px dashed #000; margin: 8px 0; }
-              .heavy-divider { border-top: 2px dashed #000; margin: 8px 0; }
-              table { width: 100%; border-collapse: collapse; }
+              @page {
+                size: 80mm auto;
+                margin: 0;
+              }
+              * {
+                box-sizing: border-box;
+                -webkit-print-color-adjust: exact;
+                margin: 0;
+                padding: 0;
+              }
+              html, body {
+                width: 100%;
+                margin: 0 auto;
+                padding: 4px 6px;
+                color: #000;
+                background: #fff;
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 13px;
+                line-height: 1.3;
+              }
+              .receipt-wrapper {
+                width: 100%;
+                max-width: 100%;
+                margin: 0 auto;
+              }
+              .center {
+                text-align: center;
+              }
+              .bold {
+                font-weight: 900;
+              }
+              .divider {
+                border-top: 1px dashed #000;
+                margin: 6px 0;
+                width: 100%;
+              }
+              .heavy-divider {
+                border-top: 2px dashed #000;
+                margin: 8px 0;
+                width: 100%;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+              }
+              th {
+                font-weight: 800;
+              }
             </style>
           </head>
           <body>
-            <div class="center">
-              <h2 style="margin: 0; font-size: 18px; font-weight: 900;">${cafeName}</h2>
-              <p style="margin: 3px auto; font-size: 10px; max-width: 280px; line-height: 1.2;">${storeAddress}</p>
-              <p style="margin: 2px 0; font-size: 11px;">${storeCity} • Contact: ${storePhone}</p>
-              <p style="margin: 2px 0; font-size: 12px;">Invoice ID: <b>${order.order_number}</b></p>
-              <p style="margin: 2px 0; font-size: 11px;">Order Time: ${formattedDate}</p>
-              <p style="margin: 2px 0; font-size: 12px;">Customer Name: <b>${order.customer_name || "Walk In Customer"}</b></p>
-              ${order.customer_phone ? `<p style="margin: 2px 0; font-size: 12px;">Mobile: <b>+91 ${order.customer_phone}</b></p>` : ""}
-            </div>
+            <div class="receipt-wrapper">
+              <div class="center">
+                <h2 style="margin: 0; font-size: 20px; font-weight: 900; letter-spacing: 0.5px;">${cafeName}</h2>
+                <p style="margin: 4px 0 2px 0; font-size: 10.5px; line-height: 1.25;">${storeAddress}</p>
+                <p style="margin: 2px 0; font-size: 11.5px; font-weight: 700;">${storeCity} • Contact: ${storePhone}</p>
+                <p style="margin: 4px 0 2px 0; font-size: 12px;">Invoice ID: <b>${order.order_number}</b></p>
+                <p style="margin: 2px 0; font-size: 11px;">Order Time: ${formattedDate}</p>
+                <p style="margin: 2px 0; font-size: 12px;">Customer: <b>${order.customer_name || "Walk In Customer"}</b></p>
+                ${order.customer_phone ? `<p style="margin: 2px 0; font-size: 12px;">Mobile: <b>+91 ${order.customer_phone}</b></p>` : ""}
+              </div>
 
-            <div class="divider"></div>
+              <div class="divider"></div>
 
-            <table>
-              <thead>
+              <table>
+                <thead>
+                  <tr>
+                    <th style="text-align: left; padding-bottom: 4px; font-size: 13px;">Items</th>
+                    <th style="text-align: right; padding-bottom: 4px; font-size: 13px;">Price Qty Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${itemsHtml}
+                </tbody>
+              </table>
+
+              <div class="divider"></div>
+
+              <table>
                 <tr>
-                  <th style="text-align: left; padding-bottom: 4px; font-size: 13px;">Items</th>
-                  <th style="text-align: right; padding-bottom: 4px; font-size: 13px;">Price Qty Total</th>
+                  <td style="padding: 2px 0; font-size: 13px;">Sub Total:</td>
+                  <td style="text-align: right; padding: 2px 0; font-size: 13px;">Rs. ${(order.total_amount - (order.gst_amount || 0)).toFixed(2)}</td>
                 </tr>
-              </thead>
-            </table>
-            <div class="divider"></div>
-            <table>
-              <tbody>
-                ${itemsHtml}
-              </tbody>
-            </table>
+                ${
+                  order.gst_amount > 0
+                    ? `<tr>
+                        <td style="padding: 2px 0; font-size: 13px;">GST:</td>
+                        <td style="text-align: right; padding: 2px 0; font-size: 13px;">Rs. ${order.gst_amount.toFixed(2)}</td>
+                      </tr>`
+                    : ""
+                }
+              </table>
 
-            <div class="divider"></div>
+              <div class="heavy-divider"></div>
 
-            <table>
-              <tr>
-                <td style="padding: 2px 0;">Sub Total:</td>
-                <td style="text-align: right; padding: 2px 0;">Rs. ${(order.total_amount - (order.gst_amount || 0)).toFixed(2)}</td>
-              </tr>
-              ${
-                order.gst_amount > 0
-                  ? `<tr>
-                      <td style="padding: 2px 0;">GST:</td>
-                      <td style="text-align: right; padding: 2px 0;">Rs. ${order.gst_amount.toFixed(2)}</td>
-                    </tr>`
-                  : ""
-              }
-            </table>
+              <table>
+                <tr style="font-size: 17px; font-weight: 900;">
+                  <td>Total Rs :</td>
+                  <td style="text-align: right;">${order.total_amount.toFixed(2)}</td>
+                </tr>
+              </table>
 
-            <div class="heavy-divider"></div>
+              <div class="heavy-divider"></div>
 
-            <table>
-              <tr style="font-size: 17px; font-weight: 900;">
-                <td>Total Rs :</td>
-                <td style="text-align: right;">${order.total_amount.toFixed(2)}</td>
-              </tr>
-            </table>
-
-            <div class="heavy-divider"></div>
-
-            <div class="center" style="margin-top: 14px;">
-              <p style="font-size: 12px; font-weight: bold; margin: 4px 0;">Scan to Pay</p>
-              <img src="${qrCodeUrl}" width="130" height="130" style="margin: 6px auto; display: block;" />
-              <p style="font-size: 11px; margin: 3px 0; font-weight: 600;">UPI: ${upiId}</p>
-              <p style="font-size: 12px; margin: 6px 0 2px 0; font-weight: bold;">Thanks for purchasing!</p>
-              <p style="font-size: 12px; margin: 0 0 4px 0;">Visit Again Soon 🍨</p>
-              <p style="font-size: 11px; margin-top: 8px; font-weight: 600; letter-spacing: 0.5px;">Powered by CocoBae</p>
+              <div class="center" style="margin-top: 10px;">
+                <p style="font-size: 12px; font-weight: 900; margin: 4px 0;">Scan to Pay</p>
+                <img src="${qrCodeUrl}" width="140" height="140" style="margin: 6px auto; display: block;" />
+                <p style="font-size: 11px; margin: 3px 0; font-weight: 700;">UPI: ${upiId}</p>
+                <p style="font-size: 12px; margin: 6px 0 2px 0; font-weight: 800;">Thanks for purchasing!</p>
+                <p style="font-size: 12px; margin: 0 0 4px 0;">Visit Again Soon 🍨</p>
+                <p style="font-size: 10.5px; margin-top: 6px; font-weight: 700; letter-spacing: 0.5px;">Powered by CocoBae</p>
+              </div>
             </div>
           </body>
         </html>
