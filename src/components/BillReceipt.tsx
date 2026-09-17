@@ -30,17 +30,24 @@ export interface BillReceiptProps {
 
 export const BillReceipt: React.FC<BillReceiptProps> = ({
   order,
-  cafeName = "CocoBae Dessert Café",
-  upiId = "cocobae@upi",
+  cafeName = "CocoBae",
+  upiId = "7043338863m@pnb",
   onNewOrder,
 }) => {
   const { isTablet, width } = useBreakpoint();
-  const [storePhone, setStorePhone] = useState("9876543210");
-  const [storeCity, setStoreCity] = useState("Ahmedabad");
+  const [storePhone, setStorePhone] = useState("7043338863");
+  const [storeCity, setStoreCity] = useState("Vadodara");
+  const [storeAddress, setStoreAddress] = useState(
+    "GROUND FLOOR. SHOP NUMBER - 12, URBAN 01, NEAR DARSHANAM OXY, NEAR PANCHMUKHI HANUMANJI, VASNA BHAYLI ROAD , Bhayli , Vadodara",
+  );
 
   useEffect(() => {
-    getSetting("store_phone", "9876543210").then(setStorePhone);
-    getSetting("store_city", "Ahmedabad").then(setStoreCity);
+    getSetting("store_phone", "7043338863").then(setStorePhone);
+    getSetting("store_city", "Vadodara").then(setStoreCity);
+    getSetting(
+      "store_address",
+      "GROUND FLOOR. SHOP NUMBER - 12, URBAN 01, NEAR DARSHANAM OXY, NEAR PANCHMUKHI HANUMANJI, VASNA BHAYLI ROAD , Bhayli , Vadodara",
+    ).then(setStoreAddress);
   }, []);
 
   // Generate UPI Payment URI for customer scanning
@@ -85,8 +92,8 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
           <body>
             <div class="center">
               <h2 style="margin: 0; font-size: 18px; font-weight: 900;">${cafeName}</h2>
-              <p style="margin: 2px 0; font-size: 12px;">${storeCity}</p>
-              <p style="margin: 2px 0; font-size: 12px;">Contact: ${storePhone}</p>
+              <p style="margin: 3px auto; font-size: 10px; max-width: 280px; line-height: 1.2;">${storeAddress}</p>
+              <p style="margin: 2px 0; font-size: 11px;">${storeCity} • Contact: ${storePhone}</p>
               <p style="margin: 2px 0; font-size: 12px;">Invoice ID: <b>${order.order_number}</b></p>
               <p style="margin: 2px 0; font-size: 11px;">Order Time: ${formattedDate}</p>
               <p style="margin: 2px 0; font-size: 12px;">Customer Name: <b>${order.customer_name || "Walk In Customer"}</b></p>
@@ -180,8 +187,8 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
           <body style="font-family: 'Courier New', monospace; padding: 30px; background: #fff; color: #111; max-width: 480px; margin: 0 auto;">
             <div style="text-align: center; border-bottom: 2px dashed #333; padding-bottom: 12px;">
               <h1 style="color: #0F0A06; margin: 0; font-size: 22px; font-weight: 900;">${cafeName}</h1>
-              <p style="color: #555; margin: 2px 0; font-size: 12px;">${storeCity}</p>
-              <p style="color: #555; margin: 2px 0; font-size: 12px;">Contact: ${storePhone}</p>
+              <p style="color: #444; margin: 3px auto; font-size: 11px; max-width: 360px; line-height: 1.3;">${storeAddress}</p>
+              <p style="color: #555; margin: 2px 0; font-size: 12px;">${storeCity} • Contact: ${storePhone}</p>
               <p style="color: #333; margin: 4px 0; font-size: 12px;">Invoice ID: <b>${order.order_number}</b></p>
               <p style="color: #666; font-size: 11px; margin: 2px 0;">Order Time: ${formattedDate}</p>
               <p style="color: #333; font-size: 12px; margin: 2px 0;">Customer Name: <b>${order.customer_name || "Walk In Customer"}</b></p>
@@ -311,9 +318,22 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
           <Text
             style={{
               color: THEME.colors.textMuted,
+              fontSize: 11,
+              textAlign: "center",
+              lineHeight: 15,
+              marginTop: 2,
+              paddingHorizontal: 8,
+            }}
+          >
+            {storeAddress}
+          </Text>
+          <Text
+            style={{
+              color: THEME.colors.textMuted,
               fontSize: 12,
               fontWeight: "600",
               letterSpacing: 0.5,
+              marginTop: 2,
             }}
           >
             {storeCity} • Contact: {storePhone}

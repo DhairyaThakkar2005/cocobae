@@ -22,6 +22,7 @@ import {
   Banknote,
   Smartphone,
   CreditCard,
+  BarChart3,
 } from "../../lib/icons";
 import { useBreakpoint } from "../../theme/breakpoints";
 import { formatINR } from "../../lib/utils";
@@ -38,6 +39,8 @@ import {
   PaymentReportItem,
   getCustomerSalesReport,
   CustomerSalesItem,
+  getSalesByDateReport,
+  SalesByDateItem,
 } from "../../db/reports";
 import { DateFilterBar } from "../../components/reports/DateFilterBar";
 import { ReportSkeleton } from "../../components/reports/ReportSkeleton";
@@ -71,18 +74,20 @@ export const SalesScreen: React.FC = () => {
   const [categoriesList, setCategoriesList] = useState<CategorySalesItem[]>([]);
   const [paymentItems, setPaymentItems] = useState<PaymentReportItem[]>([]);
   const [totalCustomersCount, setTotalCustomersCount] = useState(0);
+  const [dateSalesList, setDateSalesList] = useState<SalesByDateItem[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = async () => {
     try {
-      const [sum, prods, cats, pays, custs] = await Promise.all([
+      const [sum, prods, cats, pays, custs, dateSales] = await Promise.all([
         getReportsSummary(range),
         getProductSalesReport(range),
         getCategorySalesReport(range),
         getPaymentReport(range),
         getCustomerSalesReport(range),
+        getSalesByDateReport(range),
       ]);
 
       setSummary(sum);
@@ -91,6 +96,7 @@ export const SalesScreen: React.FC = () => {
       setCategoriesList(cats.slice(0, 3));
       setPaymentItems(pays.items);
       setTotalCustomersCount(custs.length);
+      setDateSalesList(dateSales);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -310,6 +316,144 @@ export const SalesScreen: React.FC = () => {
               </Text>
             </View>
           </View>
+        </View>
+
+        {/* Revenue & Sales Trend Bar Chart Graph */}
+        <View
+          style={{
+            backgroundColor: THEME.colors.surface,
+            borderRadius: THEME.radius.lg,
+            borderWidth: 1,
+            borderColor: THEME.colors.border,
+            padding: 16,
+            marginBottom: 20,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 4,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <BarChart3 size={16} color={THEME.colors.primary} />
+              <Text
+                style={{
+                  color: THEME.colors.text,
+                  fontSize: 15,
+                  fontWeight: "800",
+                }}
+              >
+                Revenue & Sales Trend Graph
+              </Text>
+            </View>
+            <Text
+              style={{
+                color: THEME.colors.primary,
+                fontSize: 11,
+                fontWeight: "700",
+              }}
+            >
+              {range.label}
+            </Text>
+          </View>
+          <Text
+            style={{
+              color: THEME.colors.textMuted,
+              fontSize: 11,
+              marginBottom: 16,
+            }}
+          >
+            Daily revenue bars for the selected period
+          </Text>
+
+          {dateSalesList.length === 0 ? (
+            <View
+              style={{
+                height: 100,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: THEME.colors.surface2,
+                borderRadius: THEME.radius.md,
+              }}
+            >
+              <Text style={{ color: THEME.colors.textMuted, fontSize: 12 }}>
+                No sales data recorded in this period yet.
+              </Text>
+            </View>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-end",
+                  height: 130,
+                  paddingTop: 14,
+                  minWidth: "100%",
+                  gap: 12,
+                }}
+              >
+                {(() => {
+                  const maxRev = Math.max(
+                    ...dateSalesList.map((x) => x.revenue),
+                    1,
+                  );
+                  return dateSalesList.map((d, i) => {
+                    const heightPercent = Math.max(
+                      8,
+                      Math.min(100, (d.revenue / maxRev) * 100),
+                    );
+                    return (
+                      <View
+                        key={i}
+                        style={{
+                          alignItems: "center",
+                          minWidth: dateSalesList.length <= 7 ? 40 : 36,
+                          flex: dateSalesList.length <= 7 ? 1 : undefined,
+                        }}
+                      >
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            color: THEME.colors.primary,
+                            fontSize: 9,
+                            fontWeight: "800",
+                            marginBottom: 4,
+                          }}
+                        >
+                          {d.revenue > 0 ? `₹${d.revenue}` : ""}
+                        </Text>
+                        <View
+                          style={{
+                            width: 22,
+                            height: `${heightPercent}%`,
+                            backgroundColor:
+                              d.revenue > 0
+                                ? THEME.colors.primary
+                                : THEME.colors.surface2,
+                            borderRadius: 4,
+                          }}
+                        />
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            color: THEME.colors.textMuted,
+                            fontSize: 10,
+                            fontWeight: "600",
+                            marginTop: 6,
+                          }}
+                        >
+                          {d.dayName?.slice(0, 3) || d.date.slice(-2)}
+                        </Text>
+                      </View>
+                    );
+                  });
+                })()}
+              </View>
+            </ScrollView>
+          )}
         </View>
 
         {/* Reports Section Header */}

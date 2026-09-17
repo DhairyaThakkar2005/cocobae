@@ -13,6 +13,7 @@ import {
 import * as DocumentPicker from "expo-document-picker";
 import { THEME } from "../../theme/tokens";
 import { getAllSettings, setSetting } from "../../db/settings";
+import { getDB, resetDatabaseToNewMenu } from "../../db/schema";
 import {
   performDatabaseBackup,
   getBackupFiles,
@@ -63,9 +64,12 @@ export const SettingsScreen: React.FC = () => {
 
   // Settings state
   const [cafeName, setCafeName] = useState("CocoBae");
-  const [storePhone, setStorePhone] = useState("919999999999");
-  const [storeCity, setStoreCity] = useState("Anand, Gujarat");
-  const [upiId, setUpiId] = useState("cocobae@upi");
+  const [storeAddress, setStoreAddress] = useState(
+    "GROUND FLOOR. SHOP NUMBER - 12, URBAN 01, NEAR DARSHANAM OXY, NEAR PANCHMUKHI HANUMANJI, VASNA BHAYLI ROAD , Bhayli , Vadodara",
+  );
+  const [storePhone, setStorePhone] = useState("7043338863");
+  const [storeCity, setStoreCity] = useState("Vadodara");
+  const [upiId, setUpiId] = useState("7043338863m@pnb");
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstPercent, setGstPercent] = useState("5");
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(true);
@@ -87,6 +91,7 @@ export const SettingsScreen: React.FC = () => {
       ]);
 
       if (settings.cafe_name) setCafeName(settings.cafe_name);
+      if (settings.store_address) setStoreAddress(settings.store_address);
       if (settings.store_phone) setStorePhone(settings.store_phone);
       if (settings.store_city) setStoreCity(settings.store_city);
       if (settings.upi_id) setUpiId(settings.upi_id);
@@ -115,6 +120,7 @@ export const SettingsScreen: React.FC = () => {
     try {
       await Promise.all([
         setSetting("cafe_name", cafeName.trim()),
+        setSetting("store_address", storeAddress.trim()),
         setSetting("store_phone", storePhone.trim()),
         setSetting("store_city", storeCity.trim()),
         setSetting("upi_id", upiId.trim()),
@@ -124,12 +130,39 @@ export const SettingsScreen: React.FC = () => {
         setSetting("backup_time", backupTime.trim() || "02:00"),
         setSetting("retention_days", retentionDays.trim() || "7"),
       ]);
-      Alert.alert("Saved", "Store, billing contact, and backup settings updated successfully.");
+      Alert.alert("Saved", "Store, address, billing contact, and backup settings updated successfully.");
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to save settings.");
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleResetDatabase = async () => {
+    Alert.alert(
+      "Reset Menu & Wipe Test Orders?",
+      "This will clear past test orders and reload the official 34 products & 9 categories from the flyer. Are you sure?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset Database Now",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const db = await getDB();
+              await resetDatabaseToNewMenu(db);
+              await loadSettingsAndBackups();
+              Alert.alert(
+                "Database Reset",
+                "Official flyer menu with 34 items & categories loaded successfully! Test orders cleared.",
+              );
+            } catch (err: any) {
+              Alert.alert("Error", err.message || "Failed to reset database");
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleChooseCustomBackupDir = async () => {
@@ -335,7 +368,7 @@ export const SettingsScreen: React.FC = () => {
           label="Store City / Location"
           value={storeCity}
           onChangeText={setStoreCity}
-          placeholder="e.g. Anand, Gujarat"
+          placeholder="e.g. Vadodara"
         />
         <Text
           style={{
@@ -346,6 +379,26 @@ export const SettingsScreen: React.FC = () => {
           }}
         >
           Printed directly under café title on the customer receipt.
+        </Text>
+
+        <Input
+          label="Store Full Address"
+          value={storeAddress}
+          onChangeText={setStoreAddress}
+          placeholder="Shop Address..."
+          multiline
+          numberOfLines={2}
+          style={{ minHeight: 60, textAlignVertical: "top" }}
+        />
+        <Text
+          style={{
+            color: THEME.colors.textMuted,
+            fontSize: 11,
+            marginTop: -6,
+            marginBottom: 10,
+          }}
+        >
+          Printed directly on customer thermal bills and PDF invoices.
         </Text>
 
         <Input

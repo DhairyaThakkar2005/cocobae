@@ -171,3 +171,140 @@ export async function getOrderItems(orderId: number): Promise<OrderItem[]> {
     });
   });
 }
+
+export async function deleteOrder(orderId: number): Promise<boolean> {
+  const db = await getDB();
+  if (typeof db.runAsync === "function") {
+    await db.runAsync(`DELETE FROM order_items WHERE order_id = ?`, [orderId]);
+    await db.runAsync(`DELETE FROM orders WHERE id = ?`, [orderId]);
+    return true;
+  }
+  return new Promise((resolve, reject) => {
+    db.transaction((tx: any) => {
+      tx.executeSql(`DELETE FROM order_items WHERE order_id = ?`, [orderId]);
+      tx.executeSql(
+        `DELETE FROM orders WHERE id = ?`,
+        [orderId],
+        () => resolve(true),
+        (_: any, err: any) => reject(err),
+      );
+    });
+  });
+}
+
+export async function updateOrder(
+  orderId: number,
+  orderData: Partial<Order>,
+  items?: OrderItem[],
+): Promise<void> {
+  const db = await getDB();
+
+  // 1. Build dynamic update query for orders table
+  const fields: string[] = [];
+  const params: any[] = [];
+
+  if (orderData.customer_name !== undefined) {
+    fields.push("customer_name = ?");
+    params.push(orderData.customer_name);
+  }
+  if (orderData.customer_phone !== undefined) {
+    fields.push("customer_phone = ?");
+    params.push(orderData.customer_phone);
+  }
+  if (orderData.payment_method !== undefined) {
+    fields.push("payment_method = ?");
+    params.push(orderData.payment_method);
+  }
+  if (orderData.total_amount !== undefined) {
+    fields.push("total_amount = ?");
+    params.push(orderData.total_amount);
+  }
+  if (orderData.gst_amount !== undefined) {
+    fields.push("gst_amount = ?");
+    params.push(orderData.gst_amount);
+  }
+  if (orderData.note !== undefined) {
+    fields.push("note = ?");
+    params.push(orderData.note);
+  }
+  if (orderData.status !== undefined) {
+    fields.push("status = ?");
+    params.push(orderData.status);
+  }
+
+  if (fields.length > 0) {
+    params.push(orderId);
+    const sql = `UPDATE orders SET ${fields.join(", ")} WHERE id = ?`;
+    if (typeof db.runAsync === "function") {
+      await db.runAsync(sql, params);
+    } else {
+      await new Promise((resolve, reject) => {
+        db.transaction((tx: any) => {
+          tx.executeSql(sql, params, () => resolve(true), (_: any, err: any) => reject(err));
+        });
+      });
+    }
+  }
+
+  // 2. If updated items are provided, replace existing order_items
+  if (items && items.length > 0) {
+    if (typeof db.runAsync === "function") {
+      await db.runAsync(`DELETE FROM order_items WHERE order_id = ?`, [orderId]);
+      for (const it of items) {
+        await db.runAsync(
+          `INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, subtotal)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            orderId,
+            it.product_id,
+            it.product_name,
+            it.quantity,
+            it.unit_price,
+            it.subtotal,
+          ],
+        );
+      }
+    } else {
+      await new Promise((resolve, reject) => {
+        db.transaction((tx: any) => {
+          tx.executeSql(`DELETE FROM order_items WHERE order_id = ?`, [orderId], () => {
+            for (const it of items) {
+              tx.executeSql(
+                `INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, subtotal)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [
+                  orderId,
+                  it.product_id,
+                  it.product_name,
+                  it.quantity,
+                  it.unit_price,
+                  it.subtotal,
+                ],
+              );
+            }
+            resolve(true);
+          }, (_: any, err: any) => reject(err));
+        });
+      });
+    }
+  }
+}
+
+export async function clearAllOrders(): Promise<void> {
+  const db = await getDB();
+  if (typeof db.runAsync === "function") {
+    await db.runAsync(`DELETE FROM order_items`);
+    await db.runAsync(`DELETE FROM orders`);
+    try {
+      await db.runAsync(`DELETE FROM sqlite_sequence WHERE name IN ('orders', 'order_items')`);
+    } catch {}
+  } else {
+    await new Promise((resolve, reject) => {
+      db.transaction((tx: any) => {
+        tx.executeSql(`DELETE FROM order_items`);
+        tx.executeSql(`DELETE FROM orders`, [], () => resolve(true), (_: any, err: any) => reject(err));
+      });
+    });
+  }
+}
+

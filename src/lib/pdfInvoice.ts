@@ -5,6 +5,7 @@ import { Order } from "../db/orders";
 
 export interface InvoiceOptions {
   cafeName?: string;
+  storeAddress?: string;
   storePhone?: string;
   storeCity?: string;
   upiId?: string;
@@ -19,10 +20,13 @@ export async function generateInvoicePdf(
   order: Order,
   options: InvoiceOptions = {},
 ): Promise<string> {
-  const cafeName = options.cafeName || "CocoBae Dessert Café";
-  const storePhone = options.storePhone || "919999999999";
-  const storeCity = options.storeCity || "Anand, Gujarat";
-  const upiId = options.upiId || "cocobae@upi";
+  const cafeName = options.cafeName || "CocoBae";
+  const storeAddress =
+    options.storeAddress ||
+    "GROUND FLOOR. SHOP NUMBER - 12, URBAN 01, NEAR DARSHANAM OXY, NEAR PANCHMUKHI HANUMANJI, VASNA BHAYLI ROAD , Bhayli , Vadodara";
+  const storePhone = options.storePhone || "7043338863";
+  const storeCity = options.storeCity || "Vadodara";
+  const upiId = options.upiId || "7043338863m@pnb";
 
   const formattedDate = new Date(order.order_date || Date.now()).toLocaleString(
     "en-IN",
@@ -77,8 +81,8 @@ export async function generateInvoicePdf(
       <body>
         <div style="text-align: center; border-bottom: 2px dashed #333; padding-bottom: 10px;">
           <h1 style="color: #0F0A06; margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 0.5px;">${cafeName}</h1>
-          <p style="color: #555; margin: 2px 0; font-size: 12px;">${storeCity}</p>
-          <p style="color: #555; margin: 2px 0; font-size: 12px;">Contact: ${storePhone}</p>
+          <p style="color: #444; margin: 4px auto; font-size: 11px; max-width: 360px; line-height: 1.3;">${storeAddress}</p>
+          <p style="color: #555; margin: 2px 0; font-size: 12px;">${storeCity} • Contact: ${storePhone}</p>
           <p style="color: #222; margin: 5px 0 2px 0; font-size: 13px;">Invoice ID: <b>${order.order_number}</b></p>
           <p style="color: #666; font-size: 11px; margin: 2px 0;">Order Time: ${formattedDate}</p>
           <p style="color: #222; font-size: 12px; margin: 3px 0;">Customer Name: <b>${order.customer_name || "Walk In Customer"}</b></p>

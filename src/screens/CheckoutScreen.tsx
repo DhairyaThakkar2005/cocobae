@@ -65,28 +65,31 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
 
   const [storeSettings, setStoreSettings] = useState<{
     cafeName: string;
+    storeAddress: string;
     storePhone: string;
     storeCity: string;
     upiId: string;
   }>({
-    cafeName: "CocoBae Dessert Café",
-    storePhone: "919999999999",
-    storeCity: "Anand, Gujarat",
-    upiId: "cocobae@upi",
+    cafeName: "CocoBae",
+    storeAddress:
+      "GROUND FLOOR. SHOP NUMBER - 12, URBAN 01, NEAR DARSHANAM OXY, NEAR PANCHMUKHI HANUMANJI, VASNA BHAYLI ROAD , Bhayli , Vadodara",
+    storePhone: "7043338863",
+    storeCity: "Vadodara",
+    upiId: "7043338863m@pnb",
   });
 
   useEffect(() => {
     if (!successOrder) return;
     setCountdown(5);
-    let count = 5;
     timerRef.current = setInterval(() => {
-      count -= 1;
-      if (count <= 0) {
-        if (timerRef.current) clearInterval(timerRef.current);
-        onOrderPlaced(successOrder);
-      } else {
-        setCountdown(count);
-      }
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          onOrderPlaced(successOrder);
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
 
     return () => {
@@ -104,10 +107,13 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   useEffect(() => {
     getAllSettings().then((s) => {
       setStoreSettings({
-        cafeName: s.cafe_name || "CocoBae Dessert Café",
-        storePhone: s.store_phone || "919999999999",
-        storeCity: s.store_city || "Anand, Gujarat",
-        upiId: s.upi_id || "cocobae@upi",
+        cafeName: s.cafe_name || "CocoBae",
+        storeAddress:
+          s.store_address ||
+          "GROUND FLOOR. SHOP NUMBER - 12, URBAN 01, NEAR DARSHANAM OXY, NEAR PANCHMUKHI HANUMANJI, VASNA BHAYLI ROAD , Bhayli , Vadodara",
+        storePhone: s.store_phone || "7043338863",
+        storeCity: s.store_city || "Vadodara",
+        upiId: s.upi_id || "7043338863m@pnb",
       });
     });
   }, []);
