@@ -89,8 +89,10 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
               * {
                 box-sizing: border-box;
                 -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
                 margin: 0;
                 padding: 0;
+                color: #000 !important;
               }
               html, body {
                 width: 100%;
@@ -101,8 +103,16 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
                 background: #fff;
                 font-family: 'Courier New', Courier, monospace;
                 font-size: 13px;
-                font-weight: 700;
+                font-weight: 900;
                 line-height: 1.3;
+                -webkit-font-smoothing: none;
+                text-rendering: geometricPrecision;
+                -webkit-text-stroke: 0.45px #000;
+                text-shadow: 0.25px 0 0 #000, -0.25px 0 0 #000;
+              }
+              h1, h2, h3, p, span, td, th, b, strong {
+                -webkit-text-stroke: 0.45px #000;
+                text-shadow: 0.25px 0 0 #000;
               }
               .receipt-wrapper {
                 width: 100%;
@@ -137,6 +147,7 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
               }
               td {
                 color: #000;
+                font-weight: 900;
                 word-wrap: break-word;
               }
             </style>
