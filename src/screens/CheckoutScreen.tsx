@@ -1369,6 +1369,33 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 </TouchableOpacity>
               ) : null}
             </View>
+
+            {/* Real-time Applied Charge Confirmation Banner */}
+            {deliveryCharge > 0 ? (
+              <View
+                style={{
+                  marginTop: 12,
+                  backgroundColor: THEME.colors.primary + "15",
+                  borderWidth: 1,
+                  borderColor: THEME.colors.primary + "40",
+                  borderRadius: THEME.radius.md,
+                  padding: 10,
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
+                  <CheckCircle2 size={16} color={THEME.colors.primary} />
+                  <Text style={{ color: THEME.colors.primary, fontSize: 13, fontWeight: "700" }}>
+                    {chargeNameInput.trim() || extraChargeName || "Extra Charge"} Applied
+                  </Text>
+                </View>
+                <Text style={{ color: THEME.colors.primary, fontSize: 14, fontWeight: "800" }}>
+                  +{formatINR(deliveryCharge)}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           {/* Payment Method Selector */}

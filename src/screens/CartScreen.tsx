@@ -45,10 +45,17 @@ export const CartScreen: React.FC<CartScreenProps> = ({
     getGrandTotal,
     gstEnabled,
     gstPercent,
+    getDiscountAmount,
+    discountType,
+    discountValue,
+    selectedOffer,
+    deliveryCharge,
+    extraChargeName,
   } = useCartStore();
 
   const totalItems = getTotalItemsCount();
   const subtotal = getSubtotal();
+  const discountAmount = getDiscountAmount();
   const gstAmount = getGstAmount();
   const grandTotal = getGrandTotal();
 
@@ -377,6 +384,50 @@ export const CartScreen: React.FC<CartScreenProps> = ({
                   {formatINR(subtotal)}
                 </Text>
               </View>
+
+              {discountAmount > 0 ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Text style={{ color: "#10B981", fontSize: 13, fontWeight: "600" }}>
+                    Discount {selectedOffer ? `(${selectedOffer.title})` : discountType === "percentage" ? `(${discountValue}%)` : "(Flat)"}
+                  </Text>
+                  <Text
+                    style={{
+                      color: "#10B981",
+                      fontSize: 14,
+                      fontWeight: "700",
+                    }}
+                  >
+                    -{formatINR(discountAmount)}
+                  </Text>
+                </View>
+              ) : null}
+
+              {deliveryCharge > 0 ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                    {extraChargeName || "Extra Charge"}
+                  </Text>
+                  <Text
+                    style={{
+                      color: THEME.colors.text,
+                      fontSize: 14,
+                      fontWeight: "700",
+                    }}
+                  >
+                    +{formatINR(deliveryCharge)}
+                  </Text>
+                </View>
+              ) : null}
 
               {gstEnabled ? (
                 <View
