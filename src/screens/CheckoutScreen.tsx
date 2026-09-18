@@ -87,7 +87,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   const [discountMode, setDiscountMode] = useState<"percentage" | "flat">("percentage");
   const [discountInput, setDiscountInput] = useState("");
   const [deliveryInput, setDeliveryInput] = useState(deliveryCharge > 0 ? deliveryCharge.toString() : "");
-  const [chargeNameInput, setChargeNameInput] = useState(extraChargeName || "Delivery Charge");
+  const [chargeNameInput, setChargeNameInput] = useState(extraChargeName || "");
   const [customerRecord, setCustomerRecord] = useState<Customer | null>(null);
 
   const [storeSettings, setStoreSettings] = useState<{
@@ -230,7 +230,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         discount_value: selectedOffer ? selectedOffer.discount_value : discountValue,
         discount_amount: discountAmount,
         delivery_charge: deliveryCharge || 0,
-        extra_charge_name: chargeNameInput.trim() || extraChargeName || "Delivery Charge",
+        extra_charge_name: chargeNameInput.trim() || extraChargeName.trim() || "Extra Charge",
       };
 
       const itemsPayload = items.map((it) => ({
@@ -496,6 +496,23 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                   }}
                 >
                   {successOrder.customer_phone}
+                </Text>
+              </View>
+            ) : null}
+
+            {successOrder.delivery_charge && successOrder.delivery_charge > 0 ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                  {successOrder.extra_charge_name || "Extra Charge"}
+                </Text>
+                <Text style={{ color: THEME.colors.text, fontSize: 13, fontWeight: "700" }}>
+                  +{formatINR(successOrder.delivery_charge)}
                 </Text>
               </View>
             ) : null}
@@ -1080,18 +1097,21 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 justifyContent: "space-between",
                 alignItems: "center",
                 marginBottom: 6,
+                gap: 8,
               }}
             >
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
                 <Truck size={18} color={THEME.colors.primary} />
                 <Text
+                  numberOfLines={1}
                   style={{
                     color: THEME.colors.text,
                     fontSize: 15,
                     fontWeight: "700",
+                    flexShrink: 1,
                   }}
                 >
-                  Extra Charges (Delivery / Packaging)
+                  Extra Charges
                 </Text>
               </View>
               {deliveryCharge > 0 ? (
@@ -1099,12 +1119,15 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                   onPress={() => {
                     setDeliveryCharge(0);
                     setDeliveryInput("");
+                    setChargeNameInput("");
+                    setExtraChargeName("");
                   }}
                   style={{
-                    paddingVertical: 2,
-                    paddingHorizontal: 6,
+                    paddingVertical: 3,
+                    paddingHorizontal: 8,
                     backgroundColor: "#EF444420",
                     borderRadius: 6,
+                    flexShrink: 0,
                   }}
                 >
                   <Text
@@ -1129,7 +1152,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
               Add packing, delivery, or custom service charges to this order.
             </Text>
 
-            {/* Charge Name Selection & Input */}
+            {/* Charge Name Input */}
             <View style={{ marginBottom: 12 }}>
               <Text
                 style={{
@@ -1143,38 +1166,6 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
               >
                 Charge Name
               </Text>
-              <View style={{ flexDirection: "row", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
-                {["Delivery Charge", "Packaging Charge", "Parcel Charge", "Service Charge"].map((preset) => {
-                  const isSelected = chargeNameInput.trim().toLowerCase() === preset.toLowerCase();
-                  return (
-                    <TouchableOpacity
-                      key={preset}
-                      onPress={() => {
-                        setChargeNameInput(preset);
-                        setExtraChargeName(preset);
-                      }}
-                      style={{
-                        backgroundColor: isSelected ? THEME.colors.primary : THEME.colors.surface2,
-                        borderColor: isSelected ? THEME.colors.primary : THEME.colors.border,
-                        borderWidth: 1,
-                        borderRadius: THEME.radius.full,
-                        paddingVertical: 5,
-                        paddingHorizontal: 12,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: isSelected ? "#FFFFFF" : THEME.colors.text,
-                          fontSize: 12,
-                          fontWeight: "700",
-                        }}
-                      >
-                        {preset}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
               <View
                 style={{
                   backgroundColor: THEME.colors.surface2,
@@ -1190,13 +1181,13 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                     setChargeNameInput(text);
                     setExtraChargeName(text);
                   }}
-                  placeholder="Charge Name (e.g. Delivery Charge, Container Fee)"
+                  placeholder="Enter charge name (e.g. Service Charge, Delivery, Packing)"
                   placeholderTextColor={THEME.colors.textDisabled}
                   style={{
                     color: THEME.colors.text,
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: "600",
-                    paddingVertical: 8,
+                    paddingVertical: 10,
                   }}
                 />
               </View>
@@ -1594,7 +1585,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
               </View>
             ) : null}
 
-            {/* Delivery Charge Line */}
+            {/* Extra Charge Line */}
             {deliveryCharge > 0 ? (
               <View
                 style={{
@@ -1604,7 +1595,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 }}
               >
                 <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
-                  Delivery Charge
+                  {chargeNameInput.trim() || extraChargeName || "Extra Charge"}
                 </Text>
                 <Text
                   style={{

@@ -59,7 +59,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
   discountValue: 0,
   selectedOffer: null,
   deliveryCharge: 0,
-  extraChargeName: "Delivery Charge",
+  extraChargeName: "",
 
   setSettings: (gstEnabled, gstPercent) => set({ gstEnabled, gstPercent }),
   setCustomerName: (customerName) => set({ customerName }),
@@ -83,7 +83,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
   setDeliveryCharge: (charge: number) =>
     set({ deliveryCharge: Math.max(0, Math.round(charge || 0)) }),
   setExtraChargeName: (name: string) =>
-    set({ extraChargeName: name || "Delivery Charge" }),
+    set({ extraChargeName: name }),
 
   addItem: (product, quantity = 1, note = "") => {
     set((state) => {
@@ -176,7 +176,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
       discountValue: 0,
       selectedOffer: null,
       deliveryCharge: 0,
-      extraChargeName: "Delivery Charge",
+      extraChargeName: "",
     });
   },
 
