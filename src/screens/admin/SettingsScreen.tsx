@@ -44,10 +44,35 @@ import {
   ShieldCheck,
   Upload,
   X,
+  Truck,
+  Gift,
+  Percent,
+  Plus,
+  Minus,
+  Trash2,
+  Tag,
+  Users,
+  Sparkles,
 } from "../../lib/icons";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Separator } from "../../components/ui/separator";
+import {
+  getOffers,
+  createOffer,
+  updateOffer,
+  deleteOffer,
+  Offer,
+} from "../../db/offers";
+import { getCategories, Category } from "../../db/categories";
+import {
+  getInventoryItems,
+  updateStock,
+  createInventoryItem,
+  InventoryItem,
+} from "../../db/inventory";
+import { getAllCustomers, Customer } from "../../db/customers";
+import { formatINR } from "../../lib/utils";
 
 export const SettingsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -72,11 +97,35 @@ export const SettingsScreen: React.FC = () => {
   const [upiId, setUpiId] = useState("7043338863m@pnb");
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstPercent, setGstPercent] = useState("5");
+  const [deliveryCharge, setDeliveryCharge] = useState("30");
+  const [deliveryEnabled, setDeliveryEnabled] = useState(false);
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(true);
   const [backupTime, setBackupTime] = useState("02:00");
   const [retentionDays, setRetentionDays] = useState("7");
   const [backupDirUri, setBackupDirUri] = useState<string | null>(null);
   const [backupDirName, setBackupDirName] = useState<string>("App Internal Storage (CocoBae_Backups)");
+
+  // Offers & Promotions State
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [showAddOffer, setShowAddOffer] = useState(false);
+  const [newOfferTitle, setNewOfferTitle] = useState("");
+  const [newOfferType, setNewOfferType] = useState<"percentage" | "flat" | "category_discount" | "b1g1">("percentage");
+  const [newOfferVal, setNewOfferVal] = useState("10");
+  const [newOfferCategory, setNewOfferCategory] = useState<number | null>(null);
+  const [newOfferMinOrder, setNewOfferMinOrder] = useState("0");
+
+  // Raw Material Inventory State
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [showAddInv, setShowAddInv] = useState(false);
+  const [newInvName, setNewInvName] = useState("");
+  const [newInvUnit, setNewInvUnit] = useState("kg");
+  const [newInvStock, setNewInvStock] = useState("10");
+  const [newInvMin, setNewInvMin] = useState("2");
+
+  // Customer CRM State
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [crmSearch, setCrmSearch] = useState("");
 
   // Backup files & logs
   const [backupFiles, setBackupFiles] = useState<any[]>([]);
@@ -84,11 +133,16 @@ export const SettingsScreen: React.FC = () => {
 
   const loadSettingsAndBackups = async () => {
     try {
-      const [settings, files, logs] = await Promise.all([
-        getAllSettings(),
-        getBackupFiles(),
-        getBackupLogs(10),
-      ]);
+      const [settings, files, logs, offerList, catList, invList, custList] =
+        await Promise.all([
+          getAllSettings(),
+          getBackupFiles(),
+          getBackupLogs(10),
+          getOffers(),
+          getCategories(),
+          getInventoryItems(),
+          getAllCustomers(),
+        ]);
 
       if (settings.cafe_name) setCafeName(settings.cafe_name);
       if (settings.store_address) setStoreAddress(settings.store_address);
@@ -97,6 +151,9 @@ export const SettingsScreen: React.FC = () => {
       if (settings.upi_id) setUpiId(settings.upi_id);
       if (settings.gst_enabled) setGstEnabled(settings.gst_enabled === "1");
       if (settings.gst_percent) setGstPercent(settings.gst_percent);
+      if (settings.delivery_charge !== undefined) setDeliveryCharge(settings.delivery_charge);
+      if (settings.delivery_enabled !== undefined)
+        setDeliveryEnabled(settings.delivery_enabled === "1");
       if (settings.auto_backup_enabled)
         setAutoBackupEnabled(settings.auto_backup_enabled === "1");
       if (settings.backup_time) setBackupTime(settings.backup_time);
@@ -104,6 +161,10 @@ export const SettingsScreen: React.FC = () => {
       if (settings.backup_directory_uri) setBackupDirUri(settings.backup_directory_uri);
       if (settings.backup_directory_name) setBackupDirName(settings.backup_directory_name);
 
+      setOffers(offerList);
+      setCategories(catList);
+      setInventory(invList);
+      setCustomers(custList);
       setBackupFiles(files);
       setBackupLogs(logs);
     } finally {
@@ -126,15 +187,114 @@ export const SettingsScreen: React.FC = () => {
         setSetting("upi_id", upiId.trim()),
         setSetting("gst_enabled", gstEnabled ? "1" : "0"),
         setSetting("gst_percent", gstPercent.trim() || "5"),
+        setSetting("delivery_charge", deliveryCharge.trim() || "0"),
+        setSetting("delivery_enabled", deliveryEnabled ? "1" : "0"),
         setSetting("auto_backup_enabled", autoBackupEnabled ? "1" : "0"),
         setSetting("backup_time", backupTime.trim() || "02:00"),
         setSetting("retention_days", retentionDays.trim() || "7"),
       ]);
-      Alert.alert("Saved", "Store, address, billing contact, and backup settings updated successfully.");
+      Alert.alert("Saved", "Store, billing, delivery charges, and system settings updated successfully.");
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to save settings.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleOffer = async (id: number, currentStatus: number) => {
+    try {
+      const nextStatus = currentStatus === 1 ? 0 : 1;
+      await updateOffer(id, { is_active: nextStatus });
+      setOffers((prev) =>
+        prev.map((o) => (o.id === id ? { ...o, is_active: nextStatus } : o)),
+      );
+    } catch (e: any) {
+      Alert.alert("Offer Error", e.message || "Could not update offer.");
+    }
+  };
+
+  const handleDeleteOffer = async (id: number, title: string) => {
+    Alert.alert(`Delete Offer?`, `Remove "${title}" permanently?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteOffer(id);
+            setOffers((prev) => prev.filter((o) => o.id !== id));
+          } catch (e: any) {
+            Alert.alert("Delete Error", e.message || "Could not delete offer.");
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleCreateOffer = async () => {
+    if (!newOfferTitle.trim()) {
+      Alert.alert("Validation", "Please enter an offer title.");
+      return;
+    }
+    const val = parseFloat(newOfferVal) || 0;
+    const minOrder = parseFloat(newOfferMinOrder) || 0;
+
+    try {
+      const created = await createOffer({
+        title: newOfferTitle.trim(),
+        offer_type: newOfferType,
+        discount_value: val,
+        category_id: newOfferCategory,
+        min_order_amount: minOrder,
+        is_active: 1,
+      });
+      setOffers((prev) => [created, ...prev]);
+      setShowAddOffer(false);
+      setNewOfferTitle("");
+      setNewOfferVal("10");
+      setNewOfferCategory(null);
+      setNewOfferMinOrder("0");
+      Alert.alert("Offer Created", `"${created.title}" is now active!`);
+    } catch (e: any) {
+      Alert.alert("Creation Error", e.message || "Could not create offer.");
+    }
+  };
+
+  const handleUpdateStock = async (id: number, delta: number) => {
+    try {
+      await updateStock(id, delta);
+      setInventory((prev) =>
+        prev.map((it) =>
+          it.id === id
+            ? { ...it, current_stock: Math.max(0, it.current_stock + delta) }
+            : it,
+        ),
+      );
+    } catch (e: any) {
+      Alert.alert("Inventory Error", e.message || "Could not update stock.");
+    }
+  };
+
+  const handleCreateInventoryItem = async () => {
+    if (!newInvName.trim()) {
+      Alert.alert("Validation", "Please enter item name.");
+      return;
+    }
+    try {
+      const created = await createInventoryItem({
+        name: newInvName.trim(),
+        unit: newInvUnit.trim() || "kg",
+        current_stock: parseFloat(newInvStock) || 0,
+        min_alert_stock: parseFloat(newInvMin) || 2,
+        cost_per_unit: 0,
+      });
+      setInventory((prev) => [created, ...prev]);
+      setShowAddInv(false);
+      setNewInvName("");
+      setNewInvStock("10");
+      Alert.alert("Stock Item Added", `${created.name} is now tracked.`);
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Could not add inventory item.");
     }
   };
 
@@ -482,7 +642,692 @@ export const SettingsScreen: React.FC = () => {
         ) : null}
       </View>
 
-      {/* 3. Automated Daily Backup (Cron Job) Section */}
+      {/* 3. Delivery Charges Section */}
+      <View
+        style={{
+          backgroundColor: THEME.colors.surface,
+          borderRadius: THEME.radius.lg,
+          borderWidth: 1,
+          borderColor: THEME.colors.border,
+          padding: 16,
+          marginBottom: 16,
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
+          <Truck size={16} color={THEME.colors.primary} />
+          <Text
+            style={{
+              color: THEME.colors.primary,
+              fontSize: 14,
+              fontWeight: "700",
+            }}
+          >
+            DELIVERY CHARGES ON BILL
+          </Text>
+        </View>
+
+        <Text
+          style={{
+            color: THEME.colors.textMuted,
+            fontSize: 12,
+            marginBottom: 12,
+          }}
+        >
+          Add and configure delivery charges on customer bills for takeaway / parcel / home deliveries.
+        </Text>
+
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 12,
+          }}
+        >
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text
+              style={{
+                color: THEME.colors.text,
+                fontSize: 14,
+                fontWeight: "600",
+              }}
+            >
+              Enable Delivery Charge by Default
+            </Text>
+            <Text style={{ color: THEME.colors.textMuted, fontSize: 11 }}>
+              Automatically include delivery charge on orders at checkout
+            </Text>
+          </View>
+          <Switch
+            value={deliveryEnabled}
+            onValueChange={setDeliveryEnabled}
+            trackColor={{ false: "#444", true: THEME.colors.primary }}
+            thumbColor="#FFF"
+          />
+        </View>
+
+        <Input
+          label="Default Delivery Charge (₹)"
+          value={deliveryCharge}
+          onChangeText={setDeliveryCharge}
+          placeholder="e.g. 30"
+          keyboardType="numeric"
+        />
+        <Text
+          style={{
+            color: THEME.colors.textMuted,
+            fontSize: 11,
+            marginTop: -6,
+            marginBottom: 10,
+          }}
+        >
+          Printed directly on customer thermal bill and PDF invoice under Subtotal and Discount.
+        </Text>
+      </View>
+
+      {/* 4. Discounts, B1G1 & Offers Manager */}
+      <View
+        style={{
+          backgroundColor: THEME.colors.surface,
+          borderRadius: THEME.radius.lg,
+          borderWidth: 1,
+          borderColor: THEME.colors.border,
+          padding: 16,
+          marginBottom: 16,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 8,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Gift size={16} color={THEME.colors.primary} />
+            <Text
+              style={{
+                color: THEME.colors.primary,
+                fontSize: 14,
+                fontWeight: "700",
+              }}
+            >
+              DISCOUNTS & SPECIAL OFFERS ({offers.length})
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => setShowAddOffer(!showAddOffer)}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+              backgroundColor: THEME.colors.primaryGlow,
+              paddingVertical: 4,
+              paddingHorizontal: 10,
+              borderRadius: THEME.radius.md,
+              borderWidth: 1,
+              borderColor: THEME.colors.primary,
+            }}
+          >
+            <Plus size={14} color={THEME.colors.primary} />
+            <Text style={{ color: THEME.colors.primary, fontSize: 12, fontWeight: "700" }}>
+              {showAddOffer ? "Close" : "New Offer"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text
+          style={{
+            color: THEME.colors.textMuted,
+            fontSize: 12,
+            marginBottom: 12,
+          }}
+        >
+          Create percentage discounts, flat rupee off, category-level offers, and B1G1 deals. Active offers automatically adapt products on POS menu and checkout.
+        </Text>
+
+        {/* Create New Offer Collapsible Form */}
+        {showAddOffer ? (
+          <View
+            style={{
+              backgroundColor: THEME.colors.surface2,
+              borderRadius: THEME.radius.md,
+              borderWidth: 1,
+              borderColor: THEME.colors.borderStrong,
+              padding: 14,
+              marginBottom: 14,
+            }}
+          >
+            <Text
+              style={{
+                color: THEME.colors.text,
+                fontSize: 13,
+                fontWeight: "800",
+                marginBottom: 10,
+              }}
+            >
+              Create New Promotion / Offer
+            </Text>
+
+            <Input
+              label="Offer Title"
+              value={newOfferTitle}
+              onChangeText={setNewOfferTitle}
+              placeholder="e.g. 15% Off Cold Coco / B1G1 Donuts"
+            />
+
+            <Text
+              style={{
+                color: THEME.colors.textMuted,
+                fontSize: 12,
+                fontWeight: "700",
+                marginBottom: 6,
+              }}
+            >
+              Offer Type:
+            </Text>
+            <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+              {[
+                { id: "percentage", label: "% Discount" },
+                { id: "flat", label: "Flat ₹ Off" },
+                { id: "category_discount", label: "Category % Off" },
+                { id: "b1g1", label: "B1G1 Free" },
+              ].map((t) => (
+                <TouchableOpacity
+                  key={t.id}
+                  onPress={() => setNewOfferType(t.id as any)}
+                  style={{
+                    backgroundColor:
+                      newOfferType === t.id
+                        ? THEME.colors.primary
+                        : THEME.colors.surface,
+                    paddingVertical: 6,
+                    paddingHorizontal: 10,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor:
+                      newOfferType === t.id
+                        ? THEME.colors.primary
+                        : THEME.colors.border,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color:
+                        newOfferType === t.id
+                          ? "#FFFFFF"
+                          : THEME.colors.textMuted,
+                      fontSize: 11,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Target Category Selector if category_discount or b1g1 */}
+            {newOfferType === "category_discount" || newOfferType === "b1g1" ? (
+              <View style={{ marginBottom: 10 }}>
+                <Text
+                  style={{
+                    color: THEME.colors.textMuted,
+                    fontSize: 12,
+                    fontWeight: "700",
+                    marginBottom: 6,
+                  }}
+                >
+                  Target Category:
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                  <TouchableOpacity
+                    onPress={() => setNewOfferCategory(null)}
+                    style={{
+                      backgroundColor: newOfferCategory === null ? THEME.colors.primary : THEME.colors.surface,
+                      paddingVertical: 4,
+                      paddingHorizontal: 10,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      borderColor: newOfferCategory === null ? THEME.colors.primary : THEME.colors.border,
+                    }}
+                  >
+                    <Text style={{ color: newOfferCategory === null ? "#FFF" : THEME.colors.text, fontSize: 11, fontWeight: "600" }}>
+                      All Categories
+                    </Text>
+                  </TouchableOpacity>
+                  {categories.map((c) => (
+                    <TouchableOpacity
+                      key={c.id}
+                      onPress={() => setNewOfferCategory(c.id)}
+                      style={{
+                        backgroundColor: newOfferCategory === c.id ? THEME.colors.primary : THEME.colors.surface,
+                        paddingVertical: 4,
+                        paddingHorizontal: 10,
+                        borderRadius: 6,
+                        borderWidth: 1,
+                        borderColor: newOfferCategory === c.id ? THEME.colors.primary : THEME.colors.border,
+                      }}
+                    >
+                      <Text style={{ color: newOfferCategory === c.id ? "#FFF" : THEME.colors.text, fontSize: 11, fontWeight: "600" }}>
+                        {c.emoji || "🏷️"} {c.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
+
+            {newOfferType !== "b1g1" ? (
+              <Input
+                label={
+                  newOfferType === "percentage" || newOfferType === "category_discount"
+                    ? "Discount Percentage (%)"
+                    : "Discount Flat Value (₹)"
+                }
+                value={newOfferVal}
+                onChangeText={setNewOfferVal}
+                keyboardType="numeric"
+                placeholder="10"
+              />
+            ) : null}
+
+            <Input
+              label="Minimum Order Value (₹) [0 for no minimum]"
+              value={newOfferMinOrder}
+              onChangeText={setNewOfferMinOrder}
+              keyboardType="numeric"
+              placeholder="0"
+            />
+
+            <Button
+              onPress={handleCreateOffer}
+              variant="primary"
+              size="sm"
+              style={{ marginTop: 6 }}
+            >
+              Save & Activate Offer
+            </Button>
+          </View>
+        ) : null}
+
+        {/* Offers List */}
+        {offers.map((off) => {
+          const matchedCategory = categories.find((c) => c.id === off.category_id);
+          return (
+            <View
+              key={off.id}
+              style={{
+                backgroundColor: THEME.colors.surface2,
+                borderRadius: THEME.radius.md,
+                borderWidth: 1,
+                borderColor: off.is_active ? THEME.colors.primary + "40" : THEME.colors.border,
+                padding: 12,
+                marginBottom: 8,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text
+                    style={{
+                      color: THEME.colors.text,
+                      fontSize: 13,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {off.title}
+                  </Text>
+                  <View
+                    style={{
+                      backgroundColor: off.is_active ? "#10B98120" : "#6B728020",
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 4,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: off.is_active ? "#10B981" : "#9CA3AF",
+                        fontSize: 10,
+                        fontWeight: "800",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {off.offer_type}
+                    </Text>
+                  </View>
+                </View>
+                <Text
+                  style={{
+                    color: THEME.colors.textMuted,
+                    fontSize: 11,
+                    marginTop: 2,
+                  }}
+                >
+                  {off.offer_type === "b1g1"
+                    ? `Buy 1 Get 1 Free ${matchedCategory ? `on ${matchedCategory.name}` : "Storewide"}`
+                    : off.offer_type === "category_discount"
+                    ? `${off.discount_value}% Off on ${matchedCategory?.name || "Category"}`
+                    : off.offer_type === "percentage"
+                    ? `${off.discount_value}% Off Order`
+                    : `₹${off.discount_value} Flat Off`}
+                  {off.min_order_amount > 0 ? ` &bull; Min ₹${off.min_order_amount}` : ""}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <Switch
+                  value={off.is_active === 1}
+                  onValueChange={() => handleToggleOffer(off.id, off.is_active)}
+                  trackColor={{ false: "#444", true: THEME.colors.success }}
+                  thumbColor="#FFF"
+                />
+                <TouchableOpacity
+                  onPress={() => handleDeleteOffer(off.id, off.title)}
+                  style={{ padding: 4 }}
+                >
+                  <Trash2 size={16} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* 5. Raw Material Inventory Tracking Section */}
+      <View
+        style={{
+          backgroundColor: THEME.colors.surface,
+          borderRadius: THEME.radius.lg,
+          borderWidth: 1,
+          borderColor: THEME.colors.border,
+          padding: 16,
+          marginBottom: 16,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 8,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Layers size={16} color={THEME.colors.primary} />
+            <Text
+              style={{
+                color: THEME.colors.primary,
+                fontSize: 14,
+                fontWeight: "700",
+              }}
+            >
+              RAW MATERIAL INVENTORY ({inventory.length})
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => setShowAddInv(!showAddInv)}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+              backgroundColor: THEME.colors.primaryGlow,
+              paddingVertical: 4,
+              paddingHorizontal: 10,
+              borderRadius: THEME.radius.md,
+              borderWidth: 1,
+              borderColor: THEME.colors.primary,
+            }}
+          >
+            <Plus size={14} color={THEME.colors.primary} />
+            <Text style={{ color: THEME.colors.primary, fontSize: 12, fontWeight: "700" }}>
+              {showAddInv ? "Close" : "Add Item"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text
+          style={{
+            color: THEME.colors.textMuted,
+            fontSize: 12,
+            marginBottom: 12,
+          }}
+        >
+          Track café kitchen raw materials (Milk, Coffee beans, Coco powder, Cups). Quick +/- stock adjustments.
+        </Text>
+
+        {showAddInv ? (
+          <View
+            style={{
+              backgroundColor: THEME.colors.surface2,
+              borderRadius: THEME.radius.md,
+              borderWidth: 1,
+              borderColor: THEME.colors.borderStrong,
+              padding: 14,
+              marginBottom: 14,
+            }}
+          >
+            <Input
+              label="Ingredient / Item Name"
+              value={newInvName}
+              onChangeText={setNewInvName}
+              placeholder="e.g. Milk / Sugar / Paper Cups"
+            />
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Input
+                  label="Unit (kg, L, units)"
+                  value={newInvUnit}
+                  onChangeText={setNewInvUnit}
+                  placeholder="kg"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Input
+                  label="Current Stock"
+                  value={newInvStock}
+                  onChangeText={setNewInvStock}
+                  keyboardType="numeric"
+                  placeholder="10"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Input
+                  label="Alert Threshold"
+                  value={newInvMin}
+                  onChangeText={setNewInvMin}
+                  keyboardType="numeric"
+                  placeholder="2"
+                />
+              </View>
+            </View>
+            <Button onPress={handleCreateInventoryItem} variant="primary" size="sm">
+              Save Ingredient
+            </Button>
+          </View>
+        ) : null}
+
+        {inventory.map((it) => {
+          const isLow = it.current_stock <= it.min_alert_stock;
+          return (
+            <View
+              key={it.id}
+              style={{
+                backgroundColor: THEME.colors.surface2,
+                borderRadius: THEME.radius.md,
+                borderWidth: 1,
+                borderColor: isLow ? "#EF444440" : THEME.colors.border,
+                padding: 10,
+                marginBottom: 6,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={{ color: THEME.colors.text, fontSize: 13, fontWeight: "700" }}>
+                    {it.name}
+                  </Text>
+                  {isLow ? (
+                    <View
+                      style={{
+                        backgroundColor: "#EF444420",
+                        paddingHorizontal: 6,
+                        paddingVertical: 1,
+                        borderRadius: 4,
+                      }}
+                    >
+                      <Text style={{ color: "#EF4444", fontSize: 10, fontWeight: "800" }}>
+                        LOW STOCK
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                  Stock: {it.current_stock} {it.unit} (Min alert: {it.min_alert_stock} {it.unit})
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <TouchableOpacity
+                  onPress={() => handleUpdateStock(it.id, -1)}
+                  style={{
+                    backgroundColor: THEME.colors.surface,
+                    borderWidth: 1,
+                    borderColor: THEME.colors.border,
+                    width: 30,
+                    height: 30,
+                    borderRadius: 6,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <Minus size={14} color={THEME.colors.text} />
+                </TouchableOpacity>
+                <Text style={{ color: THEME.colors.text, fontWeight: "800", minWidth: 26, textAlign: "center" }}>
+                  {it.current_stock}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => handleUpdateStock(it.id, 1)}
+                  style={{
+                    backgroundColor: THEME.colors.surface,
+                    borderWidth: 1,
+                    borderColor: THEME.colors.border,
+                    width: 30,
+                    height: 30,
+                    borderRadius: 6,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <Plus size={14} color={THEME.colors.text} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* 6. Customer CRM & Repeat Loyalty Section */}
+      <View
+        style={{
+          backgroundColor: THEME.colors.surface,
+          borderRadius: THEME.radius.lg,
+          borderWidth: 1,
+          borderColor: THEME.colors.border,
+          padding: 16,
+          marginBottom: 16,
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
+          <Users size={16} color={THEME.colors.primary} />
+          <Text
+            style={{
+              color: THEME.colors.primary,
+              fontSize: 14,
+              fontWeight: "700",
+            }}
+          >
+            CUSTOMER CRM & REPEAT LOYALTY ({customers.length})
+          </Text>
+        </View>
+
+        <Text
+          style={{
+            color: THEME.colors.textMuted,
+            fontSize: 12,
+            marginBottom: 10,
+          }}
+        >
+          Customer purchase history, repeat visit counts, and lifetime value.
+        </Text>
+
+        <Input
+          placeholder="Search by customer phone or name..."
+          value={crmSearch}
+          onChangeText={setCrmSearch}
+        />
+
+        {customers
+          .filter(
+            (c) =>
+              c.phone.includes(crmSearch) ||
+              (c.name && c.name.toLowerCase().includes(crmSearch.toLowerCase())),
+          )
+          .slice(0, 10)
+          .map((c) => (
+            <View
+              key={c.id}
+              style={{
+                backgroundColor: THEME.colors.surface2,
+                borderRadius: THEME.radius.md,
+                borderWidth: 1,
+                borderColor: THEME.colors.border,
+                padding: 10,
+                marginBottom: 6,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={{ color: THEME.colors.text, fontSize: 13, fontWeight: "700" }}>
+                    {c.name || "Valued Customer"}
+                  </Text>
+                  {c.visit_count >= 2 ? (
+                    <View
+                      style={{
+                        backgroundColor: "#F59E0B20",
+                        paddingHorizontal: 6,
+                        paddingVertical: 1,
+                        borderRadius: 4,
+                      }}
+                    >
+                      <Text style={{ color: "#D97706", fontSize: 10, fontWeight: "800" }}>
+                        LOYAL GUEST
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                  +91 {c.phone} &bull; Visits: {c.visit_count}
+                </Text>
+              </View>
+
+              <Text style={{ color: THEME.colors.primary, fontSize: 13, fontWeight: "800" }}>
+                {formatINR(c.total_spent)}
+              </Text>
+            </View>
+          ))}
+      </View>
+
+      {/* 7. Automated Daily Backup (Cron Job) Section */}
       <View
         style={{
           backgroundColor: THEME.colors.surface,

@@ -57,7 +57,10 @@ export async function initDatabase() {
       customer_name TEXT,
       customer_phone TEXT,
       note TEXT,
-      status TEXT DEFAULT 'completed'
+      status TEXT DEFAULT 'completed',
+      discount_type TEXT DEFAULT 'none',
+      discount_value REAL DEFAULT 0,
+      discount_amount REAL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS order_items (
@@ -70,6 +73,44 @@ export async function initDatabase() {
       subtotal REAL
     );
 
+    CREATE TABLE IF NOT EXISTS offers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      offer_type TEXT NOT NULL,
+      discount_value REAL DEFAULT 0,
+      category_id INTEGER,
+      min_order_amount REAL DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS customers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      phone TEXT UNIQUE NOT NULL,
+      name TEXT,
+      visit_count INTEGER DEFAULT 1,
+      total_spent REAL DEFAULT 0,
+      last_visit TEXT,
+      notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS inventory_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      unit TEXT NOT NULL,
+      current_stock REAL DEFAULT 0,
+      min_alert_stock REAL DEFAULT 5,
+      cost_per_unit REAL DEFAULT 0,
+      updated_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS product_recipes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER,
+      inventory_item_id INTEGER,
+      quantity_required REAL
+    );
+
     CREATE TABLE IF NOT EXISTS backup_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       backed_up_at TEXT,
@@ -79,19 +120,31 @@ export async function initDatabase() {
     );
   `;
 
+  const migrationQueries = [
+    "ALTER TABLE orders ADD COLUMN customer_phone TEXT;",
+    "ALTER TABLE orders ADD COLUMN discount_type TEXT DEFAULT 'none';",
+    "ALTER TABLE orders ADD COLUMN discount_value REAL DEFAULT 0;",
+    "ALTER TABLE orders ADD COLUMN discount_amount REAL DEFAULT 0;",
+    "ALTER TABLE orders ADD COLUMN delivery_charge REAL DEFAULT 0;",
+  ];
+
   if (typeof db.execAsync === "function") {
     await db.execAsync(query);
-    try {
-      await db.execAsync("ALTER TABLE orders ADD COLUMN customer_phone TEXT;");
-    } catch {
-      // Column already exists
+    for (const mq of migrationQueries) {
+      try {
+        await db.execAsync(mq);
+      } catch {
+        // Column already exists
+      }
     }
   } else if (typeof db.exec === "function") {
     await db.exec([{ sql: query, args: [] }], false);
-    try {
-      await db.exec([{ sql: "ALTER TABLE orders ADD COLUMN customer_phone TEXT;", args: [] }], false);
-    } catch {
-      // Column already exists
+    for (const mq of migrationQueries) {
+      try {
+        await db.exec([{ sql: mq, args: [] }], false);
+      } catch {
+        // Column already exists
+      }
     }
   } else {
     await new Promise((resolve, reject) => {
@@ -100,7 +153,10 @@ export async function initDatabase() {
           query,
           [],
           () => {
-            tx.executeSql("ALTER TABLE orders ADD COLUMN customer_phone TEXT;", [], () => resolve(true), () => resolve(true));
+            for (const mq of migrationQueries) {
+              tx.executeSql(mq, [], () => {}, () => true);
+            }
+            resolve(true);
           },
           (_: any, err: any) => reject(err),
         );
@@ -108,8 +164,62 @@ export async function initDatabase() {
     });
   }
 
+  // Seed default offers and inventory items if empty
+  await seedInitialOffersAndInventory(db);
+
   // Check if menu version is up to date with official flyer (v2)
   await checkAndMigrateMenu(db);
+}
+
+async function seedInitialOffersAndInventory(db: any) {
+  try {
+    let offerCount = 0;
+    if (typeof db.getFirstAsync === "function") {
+      const res = await db.getFirstAsync("SELECT COUNT(*) as count FROM offers;");
+      offerCount = res?.count || 0;
+    }
+    if (offerCount === 0) {
+      const initialOffers = [
+        { title: "Flat 10% Off", offer_type: "percentage", discount_value: 10, category_id: null },
+        { title: "Flat ₹50 Off (Min ₹300)", offer_type: "flat", discount_value: 50, category_id: null },
+        { title: "15% Off All Cold Coco", offer_type: "category_discount", discount_value: 15, category_id: 1 },
+        { title: "B1G1 Donut Fiesta", offer_type: "b1g1", discount_value: 50, category_id: 3 },
+      ];
+      for (const off of initialOffers) {
+        if (typeof db.runAsync === "function") {
+          await db.runAsync(
+            "INSERT INTO offers (title, offer_type, discount_value, category_id, is_active, created_at) VALUES (?, ?, ?, ?, 1, ?);",
+            [off.title, off.offer_type, off.discount_value, off.category_id, new Date().toISOString()]
+          );
+        }
+      }
+    }
+
+    let invCount = 0;
+    if (typeof db.getFirstAsync === "function") {
+      const res = await db.getFirstAsync("SELECT COUNT(*) as count FROM inventory_items;");
+      invCount = res?.count || 0;
+    }
+    if (invCount === 0) {
+      const initialStock = [
+        { name: "Full Cream Milk", unit: "Ltr", current_stock: 45, min_alert_stock: 10, cost_per_unit: 62 },
+        { name: "Cocoa Powder & Fudge", unit: "Kg", current_stock: 12, min_alert_stock: 3, cost_per_unit: 450 },
+        { name: "Cream Cheese", unit: "Kg", current_stock: 8, min_alert_stock: 2, cost_per_unit: 380 },
+        { name: "Lotus Biscoff Spread", unit: "Kg", current_stock: 5, min_alert_stock: 1.5, cost_per_unit: 750 },
+        { name: "Baking Flour & Sugar", unit: "Kg", current_stock: 30, min_alert_stock: 8, cost_per_unit: 42 },
+      ];
+      for (const st of initialStock) {
+        if (typeof db.runAsync === "function") {
+          await db.runAsync(
+            "INSERT INTO inventory_items (name, unit, current_stock, min_alert_stock, cost_per_unit, updated_at) VALUES (?, ?, ?, ?, ?, ?);",
+            [st.name, st.unit, st.current_stock, st.min_alert_stock, st.cost_per_unit, new Date().toISOString()]
+          );
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Seeding initial offers/inventory notice:", e);
+  }
 }
 
 export const OFFICIAL_COCOBAE_MENU = {

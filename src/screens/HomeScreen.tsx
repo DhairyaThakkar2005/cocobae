@@ -19,6 +19,7 @@ import { CategorySidebar } from "../components/CategorySidebar";
 import { getProducts, Product } from "../db/products";
 import { getCategories, Category } from "../db/categories";
 import { getAllSettings } from "../db/settings";
+import { getActiveOffers, Offer } from "../db/offers";
 import { useCartStore } from "../store/cartStore";
 
 export interface HomeScreenProps {
@@ -36,6 +37,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [activeOffers, setActiveOffers] = useState<Offer[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -60,13 +62,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const loadData = useCallback(async () => {
     try {
-      const [cats, prods, settings] = await Promise.all([
+      const [cats, prods, settings, offers] = await Promise.all([
         getCategories(),
         getProducts(selectedCategoryId, searchQuery),
         getAllSettings(),
+        getActiveOffers(),
       ]);
       setCategories(cats);
       setProducts(prods);
+      setActiveOffers(offers);
 
       if (settings.cafe_name) setCafeName(settings.cafe_name);
       setSettings(
@@ -298,10 +302,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               }
               renderItem={({ item }) => {
                 const qty = getItemQuantity(item.id);
+                // Dynamically adapt to active offers (B1G1, category discount, flat/percentage)
+                const matchingOffer = activeOffers.find(
+                  (o) => o.category_id === item.category_id || !o.category_id,
+                );
+                let offerBadge: string | undefined;
+                let discountedPrice: number | undefined;
+
+                if (matchingOffer) {
+                  if (matchingOffer.offer_type === "b1g1") {
+                    offerBadge = "B1G1 FREE";
+                  } else if (
+                    matchingOffer.offer_type === "category_discount" ||
+                    matchingOffer.offer_type === "percentage"
+                  ) {
+                    offerBadge = `${matchingOffer.discount_value}% OFF`;
+                    discountedPrice = Math.round(
+                      item.price * (1 - matchingOffer.discount_value / 100),
+                    );
+                  } else if (matchingOffer.offer_type === "flat") {
+                    offerBadge = `₹${matchingOffer.discount_value} OFF`;
+                    discountedPrice = Math.max(
+                      0,
+                      item.price - matchingOffer.discount_value,
+                    );
+                  }
+                }
+
                 return (
                   <ProductCard
                     product={item}
                     quantityInCart={qty}
+                    offerBadge={offerBadge}
+                    discountedPrice={discountedPrice}
                     onPress={() => handleOpenProduct(item)}
                     onAddQuick={() => addItem(item, 1)}
                     onIncrease={() => updateQuantity(item.id, 1)}

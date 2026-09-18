@@ -10,6 +10,8 @@ import { resolveProductImageUri } from "../lib/imageUtils";
 export interface ProductCardProps {
   product: Product;
   quantityInCart: number;
+  offerBadge?: string;
+  discountedPrice?: number;
   onPress: () => void;
   onAddQuick: () => void;
   onIncrease: () => void;
@@ -20,6 +22,8 @@ export interface ProductCardProps {
 export const ProductCard: React.FC<ProductCardProps> = ({
   product,
   quantityInCart,
+  offerBadge,
+  discountedPrice,
   onPress,
   onAddQuick,
   onIncrease,
@@ -126,6 +130,34 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               SOLD OUT
             </Text>
           </View>
+        ) : offerBadge ? (
+          <View
+            style={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              backgroundColor: "#DC2626",
+              paddingHorizontal: 7,
+              paddingVertical: 3,
+              borderRadius: 6,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.35,
+              shadowRadius: 2,
+              elevation: 4,
+            }}
+          >
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: 10,
+                fontWeight: "900",
+                letterSpacing: 0.4,
+              }}
+            >
+              {offerBadge}
+            </Text>
+          </View>
         ) : null}
       </View>
 
@@ -165,15 +197,39 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             marginTop: 4,
           }}
         >
-          <Text
-            style={{
-              color: THEME.colors.primary,
-              fontSize: 15,
-              fontWeight: "800",
-            }}
-          >
-            {formatINR(product.price)}
-          </Text>
+          {discountedPrice && discountedPrice < product.price ? (
+            <View style={{ flexDirection: "row", alignItems: "baseline", gap: 5 }}>
+              <Text
+                style={{
+                  color: THEME.colors.primary,
+                  fontSize: 15,
+                  fontWeight: "800",
+                }}
+              >
+                {formatINR(discountedPrice)}
+              </Text>
+              <Text
+                style={{
+                  color: THEME.colors.textMuted,
+                  fontSize: 11,
+                  fontWeight: "600",
+                  textDecorationLine: "line-through",
+                }}
+              >
+                {formatINR(product.price)}
+              </Text>
+            </View>
+          ) : (
+            <Text
+              style={{
+                color: THEME.colors.primary,
+                fontSize: 15,
+                fontWeight: "800",
+              }}
+            >
+              {formatINR(product.price)}
+            </Text>
+          )}
 
           {quantityInCart > 0 ? (
             <View

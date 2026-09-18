@@ -59,6 +59,8 @@ export const OrderHistoryScreen: React.FC = () => {
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [editDiscountAmount, setEditDiscountAmount] = useState("0");
+  const [editDeliveryCharge, setEditDeliveryCharge] = useState("0");
 
   const [cafeName, setCafeName] = useState("CocoBae");
   const [upiId, setUpiId] = useState("7043338863m@pnb");
@@ -122,6 +124,8 @@ export const OrderHistoryScreen: React.FC = () => {
     setEditCustomerName(o.customer_name || "");
     setEditCustomerPhone(o.customer_phone || "");
     setEditPaymentMethod(o.payment_method || "cash");
+    setEditDiscountAmount(o.discount_amount ? Math.round(o.discount_amount).toString() : "0");
+    setEditDeliveryCharge(o.delivery_charge ? Math.round(o.delivery_charge).toString() : "0");
     setEditItems(
       (o.items || []).map((it) => ({
         ...it,
@@ -192,7 +196,10 @@ export const OrderHistoryScreen: React.FC = () => {
 
     setSavingEdit(true);
     try {
-      const newTotal = editItems.reduce((sum, it) => sum + it.subtotal, 0);
+      const sub = editItems.reduce((sum, it) => sum + it.subtotal, 0);
+      const disc = Math.min(sub, Math.max(0, parseFloat(editDiscountAmount) || 0));
+      const deliv = Math.max(0, parseFloat(editDeliveryCharge) || 0);
+      const newTotal = Math.max(0, Math.round(sub - disc + (editingOrder.gst_amount || 0) + deliv));
 
       await updateOrder(
         editingOrder.id,
@@ -201,6 +208,8 @@ export const OrderHistoryScreen: React.FC = () => {
           customer_phone: editCustomerPhone.trim() || "",
           payment_method: editPaymentMethod,
           total_amount: newTotal,
+          discount_amount: disc,
+          delivery_charge: deliv,
         },
         editItems,
       );
@@ -211,6 +220,8 @@ export const OrderHistoryScreen: React.FC = () => {
         customer_phone: editCustomerPhone.trim() || "",
         payment_method: editPaymentMethod,
         total_amount: newTotal,
+        discount_amount: disc,
+        delivery_charge: deliv,
         items: editItems,
       };
 
@@ -235,7 +246,13 @@ export const OrderHistoryScreen: React.FC = () => {
     }
   };
 
-  const editTotalAmount = editItems.reduce((acc, it) => acc + it.subtotal, 0);
+  const subTotalAmount = editItems.reduce((acc, it) => acc + it.subtotal, 0);
+  const parsedDisc = Math.min(subTotalAmount, Math.max(0, parseFloat(editDiscountAmount) || 0));
+  const parsedDeliv = Math.max(0, parseFloat(editDeliveryCharge) || 0);
+  const editTotalAmount = Math.max(
+    0,
+    Math.round(subTotalAmount - parsedDisc + (editingOrder?.gst_amount || 0) + parsedDeliv),
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: THEME.colors.bg, padding: 14 }}>
@@ -1037,6 +1054,91 @@ export const OrderHistoryScreen: React.FC = () => {
               ))}
             </View>
 
+            {/* Discount & Delivery Charge Adjustment */}
+            <View
+              style={{
+                backgroundColor: THEME.colors.surface,
+                borderRadius: THEME.radius.lg,
+                borderWidth: 1,
+                borderColor: THEME.colors.border,
+                padding: 14,
+                marginBottom: 14,
+              }}
+            >
+              <Text
+                style={{
+                  color: THEME.colors.primary,
+                  fontSize: 13,
+                  fontWeight: "700",
+                  marginBottom: 10,
+                }}
+              >
+                DISCOUNT & CHARGES
+              </Text>
+
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      color: THEME.colors.text,
+                      fontSize: 12,
+                      fontWeight: "600",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Discount (₹)
+                  </Text>
+                  <TextInput
+                    value={editDiscountAmount}
+                    onChangeText={setEditDiscountAmount}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    placeholderTextColor={THEME.colors.textDisabled}
+                    style={{
+                      backgroundColor: THEME.colors.surface2,
+                      borderRadius: THEME.radius.md,
+                      borderWidth: 1,
+                      borderColor: THEME.colors.border,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      color: THEME.colors.text,
+                      fontSize: 14,
+                    }}
+                  />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      color: THEME.colors.text,
+                      fontSize: 12,
+                      fontWeight: "600",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Delivery Charge (₹)
+                  </Text>
+                  <TextInput
+                    value={editDeliveryCharge}
+                    onChangeText={setEditDeliveryCharge}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    placeholderTextColor={THEME.colors.textDisabled}
+                    style={{
+                      backgroundColor: THEME.colors.surface2,
+                      borderRadius: THEME.radius.md,
+                      borderWidth: 1,
+                      borderColor: THEME.colors.border,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      color: THEME.colors.text,
+                      fontSize: 14,
+                    }}
+                  />
+                </View>
+              </View>
+            </View>
+
             {/* Total Summary & Action Buttons */}
             <View
               style={{
@@ -1052,7 +1154,60 @@ export const OrderHistoryScreen: React.FC = () => {
                 style={{
                   flexDirection: "row",
                   justifyContent: "space-between",
+                  marginBottom: 6,
+                }}
+              >
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 13 }}>
+                  Items Subtotal
+                </Text>
+                <Text style={{ color: THEME.colors.text, fontSize: 13, fontWeight: "600" }}>
+                  {formatINR(subTotalAmount)}
+                </Text>
+              </View>
+
+              {parsedDisc > 0 ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    marginBottom: 6,
+                  }}
+                >
+                  <Text style={{ color: "#10B981", fontSize: 13, fontWeight: "600" }}>
+                    Discount
+                  </Text>
+                  <Text style={{ color: "#10B981", fontSize: 13, fontWeight: "700" }}>
+                    -{formatINR(parsedDisc)}
+                  </Text>
+                </View>
+              ) : null}
+
+              {parsedDeliv > 0 ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    marginBottom: 6,
+                  }}
+                >
+                  <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                    Delivery Charge
+                  </Text>
+                  <Text style={{ color: THEME.colors.text, fontSize: 13, fontWeight: "700" }}>
+                    +{formatINR(parsedDeliv)}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
                   alignItems: "center",
+                  borderTopWidth: 1,
+                  borderColor: THEME.colors.border,
+                  paddingTop: 10,
+                  marginTop: 4,
                 }}
               >
                 <Text
@@ -1062,7 +1217,7 @@ export const OrderHistoryScreen: React.FC = () => {
                     fontWeight: "800",
                   }}
                 >
-                  Updated Total Amount
+                  Updated Total
                 </Text>
                 <Text
                   style={{

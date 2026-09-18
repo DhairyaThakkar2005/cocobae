@@ -21,6 +21,17 @@ export interface Order {
   customer_phone?: string;
   note?: string;
   status: string;
+  discount_type?:
+    | "none"
+    | "percentage"
+    | "flat"
+    | "category_offer"
+    | "category_discount"
+    | "b1g1"
+    | "offer";
+  discount_value?: number;
+  discount_amount?: number;
+  delivery_charge?: number;
   items?: OrderItem[];
 }
 
@@ -33,8 +44,8 @@ export async function createOrder(
   const orderDate = new Date().toISOString();
 
   const insertOrderSql = `
-    INSERT INTO orders (order_number, order_date, total_amount, gst_amount, payment_method, customer_name, customer_phone, note, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO orders (order_number, order_date, total_amount, gst_amount, payment_method, customer_name, customer_phone, note, status, discount_type, discount_value, discount_amount, delivery_charge)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   const orderParams = [
     orderNumber,
@@ -46,6 +57,10 @@ export async function createOrder(
     order.customer_phone || "",
     order.note || "",
     "completed",
+    order.discount_type || "none",
+    order.discount_value || 0,
+    order.discount_amount || 0,
+    order.delivery_charge || 0,
   ];
 
   let orderId: number;
@@ -230,6 +245,22 @@ export async function updateOrder(
   if (orderData.status !== undefined) {
     fields.push("status = ?");
     params.push(orderData.status);
+  }
+  if (orderData.discount_type !== undefined) {
+    fields.push("discount_type = ?");
+    params.push(orderData.discount_type);
+  }
+  if (orderData.discount_value !== undefined) {
+    fields.push("discount_value = ?");
+    params.push(orderData.discount_value);
+  }
+  if (orderData.discount_amount !== undefined) {
+    fields.push("discount_amount = ?");
+    params.push(orderData.discount_amount);
+  }
+  if (orderData.delivery_charge !== undefined) {
+    fields.push("delivery_charge = ?");
+    params.push(orderData.delivery_charge);
   }
 
   if (fields.length > 0) {

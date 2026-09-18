@@ -13,6 +13,8 @@ import { THEME } from "../theme/tokens";
 import { useCartStore } from "../store/cartStore";
 import { createOrder, Order } from "../db/orders";
 import { getAllSettings } from "../db/settings";
+import { Offer, getActiveOffers } from "../db/offers";
+import { Customer, getCustomerByPhone, recordCustomerVisit } from "../db/customers";
 import { generateInvoicePdf, shareInvoicePdf } from "../lib/pdfInvoice";
 import { formatINR } from "../lib/utils";
 import {
@@ -26,6 +28,11 @@ import {
   Phone,
   Sparkles,
   ChevronRight,
+  Tag,
+  Gift,
+  X,
+  Award,
+  Truck,
 } from "../lib/icons";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
@@ -52,6 +59,15 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     getSubtotal,
     getGstAmount,
     getGrandTotal,
+    discountType,
+    discountValue,
+    selectedOffer,
+    setDiscount,
+    setOffer,
+    clearDiscount,
+    getDiscountAmount,
+    deliveryCharge,
+    setDeliveryCharge,
     clearCart,
   } = useCartStore();
 
@@ -62,6 +78,12 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   const [successOrder, setSuccessOrder] = useState<Order | null>(null);
   const [countdown, setCountdown] = useState(5);
   const timerRef = useRef<any>(null);
+
+  const [activeOffers, setActiveOffers] = useState<Offer[]>([]);
+  const [discountMode, setDiscountMode] = useState<"percentage" | "flat">("percentage");
+  const [discountInput, setDiscountInput] = useState("");
+  const [deliveryInput, setDeliveryInput] = useState(deliveryCharge > 0 ? deliveryCharge.toString() : "");
+  const [customerRecord, setCustomerRecord] = useState<Customer | null>(null);
 
   const [storeSettings, setStoreSettings] = useState<{
     cafeName: string;
@@ -77,6 +99,23 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     storeCity: "Vadodara",
     upiId: "7043338863m@pnb",
   });
+
+  useEffect(() => {
+    getActiveOffers().then(setActiveOffers);
+  }, []);
+
+  useEffect(() => {
+    if (customerPhone.trim().length >= 10) {
+      getCustomerByPhone(customerPhone).then((c) => {
+        setCustomerRecord(c);
+        if (c?.name && !customerName.trim()) {
+          setCustomerName(c.name);
+        }
+      });
+    } else {
+      setCustomerRecord(null);
+    }
+  }, [customerPhone]);
 
   useEffect(() => {
     if (!successOrder) return;
@@ -115,13 +154,45 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         storeCity: s.store_city || "Vadodara",
         upiId: s.upi_id || "7043338863m@pnb",
       });
+      if (s.delivery_enabled === "1" && s.delivery_charge && deliveryCharge === 0) {
+        const defaultCharge = parseFloat(s.delivery_charge) || 0;
+        setDeliveryCharge(defaultCharge);
+        setDeliveryInput(defaultCharge > 0 ? defaultCharge.toString() : "");
+      }
     });
   }, []);
 
   const totalItems = getTotalItemsCount();
   const subtotal = getSubtotal();
+  const discountAmount = getDiscountAmount();
   const gstAmount = getGstAmount();
   const grandTotal = getGrandTotal();
+
+  const handleDiscountInputChange = (val: string) => {
+    const clean = val.replace(/[^0-9.]/g, "");
+    setDiscountInput(clean);
+    const num = parseFloat(clean) || 0;
+    if (num > 0) {
+      setDiscount(discountMode, num);
+    } else {
+      clearDiscount();
+    }
+  };
+
+  const handleDeliveryInputChange = (val: string) => {
+    const clean = val.replace(/[^0-9]/g, "");
+    setDeliveryInput(clean);
+    const num = parseInt(clean, 10) || 0;
+    setDeliveryCharge(num);
+  };
+
+  const handleToggleDiscountMode = (mode: "percentage" | "flat") => {
+    setDiscountMode(mode);
+    const num = parseFloat(discountInput) || 0;
+    if (num > 0) {
+      setDiscount(mode, num);
+    }
+  };
 
   const handlePlaceOrder = async () => {
     if (items.length === 0) {
@@ -137,10 +208,14 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         total_amount: grandTotal,
         gst_amount: gstAmount,
         payment_method: paymentMethod,
-        customer_name: customerName.trim() || "Guest",
+        customer_name: customerName.trim() || customerRecord?.name || "Guest",
         customer_phone: customerPhone.trim() || undefined,
         note: orderNote.trim(),
         status: "completed",
+        discount_type: selectedOffer ? ("offer" as const) : discountType,
+        discount_value: selectedOffer ? selectedOffer.discount_value : discountValue,
+        discount_amount: discountAmount,
+        delivery_charge: deliveryCharge || 0,
       };
 
       const itemsPayload = items.map((it) => ({
@@ -152,6 +227,11 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       }));
 
       const created = await createOrder(orderPayload, itemsPayload);
+
+      // Record CRM customer visit
+      if (customerPhone.trim().length >= 10) {
+        recordCustomerVisit(customerPhone.trim(), customerName.trim(), grandTotal).catch(() => {});
+      }
 
       // Attach order items to created object
       created.items = itemsPayload;
@@ -630,6 +710,492 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 }}
               />
             </View>
+
+            {/* Instant CRM Repeat Customer Loyalty Banner */}
+            {customerRecord ? (
+              <View
+                style={{
+                  backgroundColor: "#F59E0B15",
+                  borderWidth: 1.5,
+                  borderColor: "#F59E0B50",
+                  borderRadius: THEME.radius.md,
+                  padding: 12,
+                  marginTop: 10,
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Sparkles size={16} color="#D97706" />
+                    <Text style={{ color: "#D97706", fontSize: 13, fontWeight: "900" }}>
+                      Repeat Customer: {customerRecord.name || "Valued Guest"}
+                    </Text>
+                  </View>
+                  <Text style={{ color: THEME.colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                    Visit #{customerRecord.visit_count + 1} &bull; Total Spent: {formatINR(customerRecord.total_spent)}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    handleToggleDiscountMode("percentage");
+                    handleDiscountInputChange("10");
+                  }}
+                  style={{
+                    backgroundColor: "#D97706",
+                    paddingVertical: 6,
+                    paddingHorizontal: 10,
+                    borderRadius: 8,
+                    shadowColor: "#D97706",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 4,
+                    elevation: 3,
+                  }}
+                >
+                  <Text style={{ color: "#FFFFFF", fontSize: 11, fontWeight: "800" }}>
+                    Apply 10% Off
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Discount & Special Offers Card */}
+          <View
+            style={{
+              backgroundColor: THEME.colors.surface,
+              borderRadius: THEME.radius.lg,
+              borderWidth: 1,
+              borderColor: THEME.colors.border,
+              padding: 16,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 6,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Tag size={18} color={THEME.colors.primary} />
+                <Text
+                  style={{
+                    color: THEME.colors.text,
+                    fontSize: 15,
+                    fontWeight: "700",
+                  }}
+                >
+                  Discount & Offers
+                </Text>
+              </View>
+              {discountAmount > 0 ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    clearDiscount();
+                    setDiscountInput("");
+                  }}
+                  style={{
+                    paddingVertical: 2,
+                    paddingHorizontal: 6,
+                    backgroundColor: "#EF444420",
+                    borderRadius: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#EF4444",
+                      fontSize: 11,
+                      fontWeight: "700",
+                    }}
+                  >
+                    Clear Discount
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <Text
+              style={{
+                color: THEME.colors.textMuted,
+                fontSize: 12,
+                marginBottom: 12,
+              }}
+            >
+              Choose a promo offer or enter a percentage / flat rupee discount.
+            </Text>
+
+            {/* Active Café Promo Offers */}
+            {activeOffers.length > 0 ? (
+              <View style={{ marginBottom: 12 }}>
+                <Text
+                  style={{
+                    color: THEME.colors.textMuted,
+                    fontSize: 11,
+                    fontWeight: "800",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                    marginBottom: 8,
+                  }}
+                >
+                  Active Offers (Tap to Apply)
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
+                >
+                  {activeOffers.map((off) => {
+                    const isSelected = selectedOffer?.id === off.id;
+                    return (
+                      <TouchableOpacity
+                        key={off.id}
+                        onPress={() => {
+                          if (isSelected) {
+                            clearDiscount();
+                            setDiscountInput("");
+                          } else {
+                            setOffer(off);
+                            setDiscountInput("");
+                          }
+                        }}
+                        activeOpacity={0.8}
+                        style={{
+                          backgroundColor: isSelected
+                            ? THEME.colors.primary
+                            : THEME.colors.surface2,
+                          borderColor: isSelected
+                            ? THEME.colors.primary
+                            : THEME.colors.border,
+                          borderWidth: 1.5,
+                          borderRadius: THEME.radius.full,
+                          paddingVertical: 6,
+                          paddingHorizontal: 12,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <Gift
+                          size={14}
+                          color={
+                            isSelected
+                              ? THEME.colors.textInverse
+                              : THEME.colors.primary
+                          }
+                        />
+                        <Text
+                          style={{
+                            color: isSelected
+                              ? THEME.colors.textInverse
+                              : THEME.colors.text,
+                            fontSize: 12,
+                            fontWeight: "700",
+                          }}
+                        >
+                          {off.title}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            ) : null}
+
+            {/* Manual Discount Input Bar */}
+            <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+              {/* % vs ₹ Toggle */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  backgroundColor: THEME.colors.surface2,
+                  borderRadius: THEME.radius.md,
+                  borderWidth: 1,
+                  borderColor: THEME.colors.border,
+                  overflow: "hidden",
+                }}
+              >
+                <TouchableOpacity
+                  onPress={() => handleToggleDiscountMode("percentage")}
+                  style={{
+                    paddingVertical: 10,
+                    paddingHorizontal: 14,
+                    backgroundColor:
+                      discountMode === "percentage" && !selectedOffer
+                        ? THEME.colors.primary
+                        : "transparent",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color:
+                        discountMode === "percentage" && !selectedOffer
+                          ? THEME.colors.textInverse
+                          : THEME.colors.text,
+                      fontWeight: "800",
+                      fontSize: 13,
+                    }}
+                  >
+                    % Off
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleToggleDiscountMode("flat")}
+                  style={{
+                    paddingVertical: 10,
+                    paddingHorizontal: 14,
+                    backgroundColor:
+                      discountMode === "flat" && !selectedOffer
+                        ? THEME.colors.primary
+                        : "transparent",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color:
+                        discountMode === "flat" && !selectedOffer
+                          ? THEME.colors.textInverse
+                          : THEME.colors.text,
+                      fontWeight: "800",
+                      fontSize: 13,
+                    }}
+                  >
+                    ₹ Flat
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Number Input Box */}
+              <View
+                style={{
+                  flex: 1,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: THEME.colors.surface2,
+                  borderRadius: THEME.radius.md,
+                  borderWidth: 1,
+                  borderColor: THEME.colors.border,
+                  paddingHorizontal: 12,
+                }}
+              >
+                <TextInput
+                  value={discountInput}
+                  onChangeText={handleDiscountInputChange}
+                  placeholder={
+                    discountMode === "percentage"
+                      ? "Enter % (e.g. 10)"
+                      : "Enter ₹ (e.g. 50)"
+                  }
+                  placeholderTextColor={THEME.colors.textDisabled}
+                  keyboardType="numeric"
+                  style={{
+                    flex: 1,
+                    color: THEME.colors.text,
+                    fontSize: 14,
+                    paddingVertical: 10,
+                  }}
+                />
+                {discountInput.length > 0 ? (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setDiscountInput("");
+                      clearDiscount();
+                    }}
+                  >
+                    <X size={16} color={THEME.colors.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Applied Discount Confirmation Banner */}
+            {discountAmount > 0 ? (
+              <View
+                style={{
+                  marginTop: 10,
+                  backgroundColor: "#10B98115",
+                  borderWidth: 1,
+                  borderColor: "#10B98140",
+                  borderRadius: THEME.radius.md,
+                  padding: 10,
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <CheckCircle2 size={16} color="#10B981" />
+                  <Text style={{ color: "#10B981", fontSize: 12, fontWeight: "700" }}>
+                    {selectedOffer
+                      ? selectedOffer.title
+                      : `${discountValue}${discountMode === "percentage" ? "%" : "₹"} Discount Applied`}
+                  </Text>
+                </View>
+                <Text style={{ color: "#10B981", fontSize: 13, fontWeight: "800" }}>
+                  -Rs. {discountAmount}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Delivery & Parcel Charges Card */}
+          <View
+            style={{
+              backgroundColor: THEME.colors.surface,
+              borderRadius: THEME.radius.lg,
+              borderWidth: 1,
+              borderColor: THEME.colors.border,
+              padding: 16,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 6,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Truck size={18} color={THEME.colors.primary} />
+                <Text
+                  style={{
+                    color: THEME.colors.text,
+                    fontSize: 15,
+                    fontWeight: "700",
+                  }}
+                >
+                  Delivery / Parcel Charge
+                </Text>
+              </View>
+              {deliveryCharge > 0 ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    setDeliveryCharge(0);
+                    setDeliveryInput("");
+                  }}
+                  style={{
+                    paddingVertical: 2,
+                    paddingHorizontal: 6,
+                    backgroundColor: "#EF444420",
+                    borderRadius: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#EF4444",
+                      fontSize: 11,
+                      fontWeight: "700",
+                    }}
+                  >
+                    Remove
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <Text
+              style={{
+                color: THEME.colors.textMuted,
+                fontSize: 12,
+                marginBottom: 12,
+              }}
+            >
+              Add packing or delivery charges to this order.
+            </Text>
+
+            {/* Quick Delivery Charge Pills */}
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+              {[
+                { label: "No Charge", val: 0 },
+                { label: "₹30 Delivery", val: 30 },
+                { label: "₹40 Delivery", val: 40 },
+                { label: "₹50 Delivery", val: 50 },
+              ].map((pill) => {
+                const isSelected = deliveryCharge === pill.val;
+                return (
+                  <TouchableOpacity
+                    key={pill.val}
+                    onPress={() => {
+                      setDeliveryCharge(pill.val);
+                      setDeliveryInput(pill.val > 0 ? pill.val.toString() : "");
+                    }}
+                    style={{
+                      flex: 1,
+                      backgroundColor: isSelected
+                        ? THEME.colors.primary
+                        : THEME.colors.surface2,
+                      borderColor: isSelected
+                        ? THEME.colors.primary
+                        : THEME.colors.border,
+                      borderWidth: 1,
+                      borderRadius: THEME.radius.md,
+                      paddingVertical: 8,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: isSelected ? "#FFFFFF" : THEME.colors.text,
+                        fontSize: 11,
+                        fontWeight: "700",
+                      }}
+                    >
+                      {pill.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Custom Amount Input */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: THEME.colors.surface2,
+                borderRadius: THEME.radius.md,
+                borderWidth: 1,
+                borderColor: THEME.colors.border,
+                paddingHorizontal: 12,
+              }}
+            >
+              <Text
+                style={{
+                  color: THEME.colors.textMuted,
+                  fontSize: 14,
+                  fontWeight: "700",
+                  marginRight: 6,
+                }}
+              >
+                ₹
+              </Text>
+              <TextInput
+                value={deliveryInput}
+                onChangeText={handleDeliveryInputChange}
+                placeholder="Custom delivery charge (e.g. 45)"
+                placeholderTextColor={THEME.colors.textDisabled}
+                keyboardType="numeric"
+                style={{
+                  flex: 1,
+                  color: THEME.colors.text,
+                  fontSize: 14,
+                  paddingVertical: 10,
+                }}
+              />
+              {deliveryInput.length > 0 ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    setDeliveryInput("");
+                    setDeliveryCharge(0);
+                  }}
+                >
+                  <X size={16} color={THEME.colors.textMuted} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
           </View>
 
           {/* Payment Method Selector */}
@@ -774,39 +1340,171 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
               </Text>
             </View>
 
-            {items.map((it) => (
+            {items.map((it) => {
+              const isB1G1Eligible =
+                selectedOffer?.offer_type === "b1g1" &&
+                (!selectedOffer.category_id ||
+                  it.product.category_id === selectedOffer.category_id) &&
+                it.quantity >= 2;
+              const freeUnits = isB1G1Eligible ? Math.floor(it.quantity / 2) : 0;
+              const b1g1Savings = freeUnits * it.product.price;
+
+              const isCatDiscount =
+                selectedOffer?.offer_type === "category_discount" &&
+                it.product.category_id === selectedOffer.category_id;
+              const catDiscountSavings = isCatDiscount
+                ? Math.round((it.subtotal * selectedOffer.discount_value) / 100)
+                : 0;
+
+              return (
+                <View key={it.product.id} style={{ paddingVertical: 4 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        color: THEME.colors.textMuted,
+                        fontSize: 13,
+                        flex: 1,
+                        marginRight: 8,
+                      }}
+                    >
+                      {it.product.name} × {it.quantity}
+                    </Text>
+                    <Text
+                      style={{
+                        color: THEME.colors.text,
+                        fontSize: 13,
+                        fontWeight: "600",
+                      }}
+                    >
+                      {formatINR(it.subtotal)}
+                    </Text>
+                  </View>
+
+                  {/* Dynamic Offer / B1G1 Product Adaptation Indicator */}
+                  {freeUnits > 0 ? (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
+                        marginTop: 2,
+                      }}
+                    >
+                      <Sparkles size={12} color="#10B981" />
+                      <Text
+                        style={{
+                          color: "#10B981",
+                          fontSize: 11,
+                          fontWeight: "700",
+                        }}
+                      >
+                        B1G1 Applied: {freeUnits} free unit{freeUnits > 1 ? "s" : ""} (-{formatINR(b1g1Savings)})
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {catDiscountSavings > 0 ? (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
+                        marginTop: 2,
+                      }}
+                    >
+                      <Tag size={12} color="#10B981" />
+                      <Text
+                        style={{
+                          color: "#10B981",
+                          fontSize: 11,
+                          fontWeight: "700",
+                        }}
+                      >
+                        {selectedOffer!.discount_value}% Category Offer (-{formatINR(catDiscountSavings)})
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
+
+            <Separator style={{ marginVertical: 10 }} />
+
+            {/* Subtotal */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginBottom: 6,
+              }}
+            >
+              <Text style={{ color: THEME.colors.textMuted, fontSize: 13 }}>
+                Sub Total
+              </Text>
+              <Text
+                style={{
+                  color: THEME.colors.text,
+                  fontSize: 13,
+                  fontWeight: "600",
+                }}
+              >
+                {formatINR(subtotal)}
+              </Text>
+            </View>
+
+            {/* Discount Line if > 0 */}
+            {discountAmount > 0 ? (
               <View
-                key={it.product.id}
                 style={{
                   flexDirection: "row",
                   justifyContent: "space-between",
-                  paddingVertical: 4,
+                  marginBottom: 6,
                 }}
               >
+                <Text style={{ color: "#10B981", fontSize: 13, fontWeight: "700" }}>
+                  Discount {selectedOffer ? `(${selectedOffer.title})` : discountMode === "percentage" ? `(${discountValue}%)` : "(Flat)"}
+                </Text>
                 <Text
-                  numberOfLines={1}
                   style={{
-                    color: THEME.colors.textMuted,
+                    color: "#10B981",
                     fontSize: 13,
-                    flex: 1,
-                    marginRight: 8,
+                    fontWeight: "700",
                   }}
                 >
-                  {it.product.name} × {it.quantity}
+                  -{formatINR(discountAmount)}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Delivery Charge Line */}
+            {deliveryCharge > 0 ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  marginBottom: 6,
+                }}
+              >
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                  Delivery Charge
                 </Text>
                 <Text
                   style={{
                     color: THEME.colors.text,
                     fontSize: 13,
-                    fontWeight: "600",
+                    fontWeight: "700",
                   }}
                 >
-                  {formatINR(it.subtotal)}
+                  +{formatINR(deliveryCharge)}
                 </Text>
               </View>
-            ))}
-
-            <Separator style={{ marginVertical: 10 }} />
+            ) : null}
 
             {gstAmount > 0 ? (
               <View
@@ -836,6 +1534,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 flexDirection: "row",
                 justifyContent: "space-between",
                 alignItems: "center",
+                marginTop: 4,
               }}
             >
               <Text

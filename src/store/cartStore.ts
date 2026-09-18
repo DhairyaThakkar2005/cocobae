@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { Product } from "../db/products";
+import { Offer, calculateOfferDiscount } from "../db/offers";
 
 export interface CartItem {
   product: Product;
@@ -16,10 +17,19 @@ interface CartStore {
   gstEnabled: boolean;
   gstPercent: number;
 
+  discountType: "none" | "percentage" | "flat" | "offer";
+  discountValue: number;
+  selectedOffer: Offer | null;
+  deliveryCharge: number;
+
   setSettings: (gstEnabled: boolean, gstPercent: number) => void;
   setCustomerName: (name: string) => void;
   setCustomerPhone: (phone: string) => void;
   setOrderNote: (note: string) => void;
+  setDiscount: (type: "none" | "percentage" | "flat", value: number) => void;
+  setOffer: (offer: Offer | null) => void;
+  clearDiscount: () => void;
+  setDeliveryCharge: (charge: number) => void;
 
   addItem: (product: Product, quantity?: number, note?: string) => void;
   updateQuantity: (productId: number, delta: number) => void;
@@ -30,6 +40,7 @@ interface CartStore {
   getItemQuantity: (productId: number) => number;
   getTotalItemsCount: () => number;
   getSubtotal: () => number;
+  getDiscountAmount: () => number;
   getGstAmount: () => number;
   getGrandTotal: () => number;
 }
@@ -42,10 +53,32 @@ export const useCartStore = create<CartStore>((set, get) => ({
   gstEnabled: false,
   gstPercent: 5,
 
+  discountType: "none",
+  discountValue: 0,
+  selectedOffer: null,
+  deliveryCharge: 0,
+
   setSettings: (gstEnabled, gstPercent) => set({ gstEnabled, gstPercent }),
   setCustomerName: (customerName) => set({ customerName }),
   setCustomerPhone: (customerPhone) => set({ customerPhone }),
   setOrderNote: (orderNote) => set({ orderNote }),
+  setDiscount: (discountType, discountValue) =>
+    set({ discountType, discountValue, selectedOffer: null }),
+  setOffer: (offer) => {
+    if (!offer) {
+      set({ selectedOffer: null, discountType: "none", discountValue: 0 });
+    } else {
+      set({
+        selectedOffer: offer,
+        discountType: "offer",
+        discountValue: offer.discount_value,
+      });
+    }
+  },
+  clearDiscount: () =>
+    set({ discountType: "none", discountValue: 0, selectedOffer: null }),
+  setDeliveryCharge: (charge: number) =>
+    set({ deliveryCharge: Math.max(0, Math.round(charge || 0)) }),
 
   addItem: (product, quantity = 1, note = "") => {
     set((state) => {
@@ -129,7 +162,16 @@ export const useCartStore = create<CartStore>((set, get) => ({
   },
 
   clearCart: () => {
-    set({ items: [], customerName: "", customerPhone: "", orderNote: "" });
+    set({
+      items: [],
+      customerName: "",
+      customerPhone: "",
+      orderNote: "",
+      discountType: "none",
+      discountValue: 0,
+      selectedOffer: null,
+      deliveryCharge: 0,
+    });
   },
 
   getItemQuantity: (productId) => {
@@ -145,14 +187,40 @@ export const useCartStore = create<CartStore>((set, get) => ({
     return get().items.reduce((sum, item) => sum + item.subtotal, 0);
   },
 
+  getDiscountAmount: () => {
+    const { items, selectedOffer, discountType, discountValue } = get();
+    const subtotal = get().getSubtotal();
+    if (subtotal <= 0) return 0;
+
+    if (selectedOffer) {
+      return calculateOfferDiscount(items, selectedOffer);
+    }
+
+    if (discountType === "percentage") {
+      return Math.round((subtotal * Math.min(100, Math.max(0, discountValue))) / 100);
+    }
+
+    if (discountType === "flat") {
+      return Math.min(subtotal, Math.max(0, Math.round(discountValue)));
+    }
+
+    return 0;
+  },
+
   getGstAmount: () => {
     const { gstEnabled, gstPercent } = get();
     if (!gstEnabled) return 0;
     const subtotal = get().getSubtotal();
-    return Math.round((subtotal * gstPercent) / 100);
+    const discount = get().getDiscountAmount();
+    const taxableAmount = Math.max(0, subtotal - discount);
+    return Math.round((taxableAmount * gstPercent) / 100);
   },
 
   getGrandTotal: () => {
-    return get().getSubtotal() + get().getGstAmount();
+    const subtotal = get().getSubtotal();
+    const discount = get().getDiscountAmount();
+    const gst = get().getGstAmount();
+    const delivery = get().deliveryCharge || 0;
+    return Math.max(0, Math.round(subtotal - discount + gst + delivery));
   },
 }));

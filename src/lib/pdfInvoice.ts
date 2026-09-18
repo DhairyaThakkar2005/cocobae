@@ -104,8 +104,24 @@ export async function generateInvoicePdf(
         <div style="margin-top: 12px; border-top: 1px dashed #333; padding-top: 8px;">
           <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
             <span>Sub Total:</span>
-            <span>Rs. ${Math.round(order.total_amount - (order.gst_amount || 0))}</span>
+            <span>Rs. ${Math.round((order.items || []).reduce((acc, it) => acc + it.subtotal, 0))}</span>
           </div>
+          ${
+            order.discount_amount && order.discount_amount > 0
+              ? `<div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; color: #b91c1c; font-weight: bold;">
+                  <span>Discount ${order.discount_type === "percentage" ? `(${order.discount_value}%)` : ""}:</span>
+                  <span>-Rs. ${Math.round(order.discount_amount)}</span>
+                </div>`
+              : ""
+          }
+          ${
+            order.delivery_charge && order.delivery_charge > 0
+              ? `<div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                  <span>Delivery Charge:</span>
+                  <span>+Rs. ${Math.round(order.delivery_charge)}</span>
+                </div>`
+              : ""
+          }
           ${
             order.gst_amount > 0
               ? `<div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">

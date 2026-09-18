@@ -21,6 +21,8 @@ export {
   Banknote,
   Smartphone,
   Sparkles,
+  Gift,
+  Percent,
   BarChart3,
   Calendar,
   Layers,
@@ -52,4 +54,5 @@ export {
   CalendarRange,
   RotateCcw,
   ShieldCheck,
+  Truck,
 } from "lucide-react-native";
