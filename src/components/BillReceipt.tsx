@@ -96,12 +96,13 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
                 width: 100%;
                 max-width: 100%;
                 margin: 0 auto;
-                padding: 4px 8px;
+                padding: 6px 4px 16px 4px;
                 color: #000;
                 background: #fff;
-                font-family: 'Courier New', Courier, monospace;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
                 font-size: 13px;
-                line-height: 1.3;
+                line-height: 1.35;
+                -webkit-font-smoothing: none;
               }
               .receipt-wrapper {
                 width: 100%;
@@ -112,15 +113,15 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
                 text-align: center;
               }
               .bold {
-                font-weight: 900;
+                font-weight: 800;
               }
               .divider {
-                border-top: 1px dashed #000;
-                margin: 6px 0;
+                border-top: 2px dashed #000;
+                margin: 8px 0;
                 width: 100%;
               }
               .heavy-divider {
-                border-top: 2px dashed #000;
+                border-top: 3px double #000;
                 margin: 8px 0;
                 width: 100%;
               }
@@ -130,32 +131,57 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
               }
               th {
                 font-weight: 800;
+                font-size: 13px;
+                color: #000;
+              }
+              td {
+                color: #000;
               }
             </style>
           </head>
           <body>
             <div class="receipt-wrapper">
               <div class="center">
-                <h2 style="margin: 0; font-size: 20px; font-weight: 900; letter-spacing: 0.5px;">${cafeName}</h2>
-                <p style="margin: 4px 0 2px 0; font-size: 10.5px; line-height: 1.25;">${storeAddress}</p>
-                <p style="margin: 2px 0; font-size: 11.5px; font-weight: 700;">${storeCity} • Contact: ${storePhone}</p>
-                <p style="margin: 4px 0 2px 0; font-size: 12px;">Invoice ID: <b>${order.order_number}</b></p>
-                <p style="margin: 2px 0; font-size: 11px;">Order Time: ${formattedDate}</p>
-                <p style="margin: 2px 0; font-size: 12px;">Customer: <b>${order.customer_name || "Walk In Customer"}</b></p>
-                ${order.customer_phone ? `<p style="margin: 2px 0; font-size: 12px;">Mobile: <b>+91 ${order.customer_phone}</b></p>` : ""}
+                <h1 style="margin: 0; font-size: 26px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">${cafeName}</h1>
+                <p style="margin: 4px 0 2px 0; font-size: 11.5px; font-weight: 600; line-height: 1.35;">${storeAddress}</p>
+                <p style="margin: 3px 0; font-size: 12.5px; font-weight: 800;">${storeCity} &bull; Ph: ${storePhone}</p>
+                <div style="margin: 6px auto; display: inline-block; border: 1.5px solid #000; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
+                  Official Tax Invoice
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; margin-top: 4px;">
+                  <span>Inv: #${order.order_number}</span>
+                  <span>${formattedDate}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; margin-top: 2px;">
+                  <span>Cust: ${order.customer_name || "Walk-In"}</span>
+                  ${order.customer_phone ? `<span>Ph: ${order.customer_phone}</span>` : `<span>Pay: ${(order.payment_method || "UPI").toUpperCase()}</span>`}
+                </div>
               </div>
 
               <div class="divider"></div>
 
               <table>
                 <thead>
-                  <tr>
-                    <th style="text-align: left; padding-bottom: 4px; font-size: 13px;">Items</th>
-                    <th style="text-align: right; padding-bottom: 4px; font-size: 13px;">Price Qty Total</th>
+                  <tr style="border-bottom: 1.5px solid #000;">
+                    <th style="text-align: left; padding: 4px 0;">Item</th>
+                    <th style="text-align: center; padding: 4px 0; width: 40px;">Qty</th>
+                    <th style="text-align: right; padding: 4px 0;">Price</th>
+                    <th style="text-align: right; padding: 4px 0;">Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${itemsHtml}
+                  ${(order.items || [])
+                    .map(
+                      (it) => `
+                    <tr>
+                      <td style="padding: 5px 0; font-size: 13px; font-weight: 700; text-align: left;">${it.product_name}</td>
+                      <td style="padding: 5px 0; font-size: 13px; font-weight: 800; text-align: center;">${it.quantity}</td>
+                      <td style="padding: 5px 0; font-size: 13px; font-weight: 600; text-align: right;">${it.unit_price.toFixed(2)}</td>
+                      <td style="padding: 5px 0; font-size: 13px; font-weight: 800; text-align: right;">${it.subtotal.toFixed(2)}</td>
+                    </tr>
+                  `,
+                    )
+                    .join("")}
                 </tbody>
               </table>
 
@@ -163,14 +189,14 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
 
               <table>
                 <tr>
-                  <td style="padding: 2px 0; font-size: 13px;">Sub Total:</td>
-                  <td style="text-align: right; padding: 2px 0; font-size: 13px;">Rs. ${(order.total_amount - (order.gst_amount || 0)).toFixed(2)}</td>
+                  <td style="padding: 3px 0; font-size: 13px; font-weight: 700;">Sub Total:</td>
+                  <td style="text-align: right; padding: 3px 0; font-size: 13px; font-weight: 700;">Rs. ${(order.total_amount - (order.gst_amount || 0)).toFixed(2)}</td>
                 </tr>
                 ${
                   order.gst_amount > 0
                     ? `<tr>
-                        <td style="padding: 2px 0; font-size: 13px;">GST:</td>
-                        <td style="text-align: right; padding: 2px 0; font-size: 13px;">Rs. ${order.gst_amount.toFixed(2)}</td>
+                        <td style="padding: 3px 0; font-size: 13px; font-weight: 700;">GST Tax:</td>
+                        <td style="text-align: right; padding: 3px 0; font-size: 13px; font-weight: 700;">Rs. ${order.gst_amount.toFixed(2)}</td>
                       </tr>`
                     : ""
                 }
@@ -178,22 +204,22 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
 
               <div class="heavy-divider"></div>
 
-              <table>
-                <tr style="font-size: 17px; font-weight: 900;">
-                  <td>Total Rs :</td>
-                  <td style="text-align: right;">${order.total_amount.toFixed(2)}</td>
+              <table style="margin: 4px 0;">
+                <tr style="font-size: 20px; font-weight: 900;">
+                  <td style="letter-spacing: 0.5px;">TOTAL:</td>
+                  <td style="text-align: right; font-size: 22px;">Rs. ${order.total_amount.toFixed(2)}</td>
                 </tr>
               </table>
 
               <div class="heavy-divider"></div>
 
-              <div class="center" style="margin-top: 10px;">
-                <p style="font-size: 12px; font-weight: 900; margin: 4px 0;">Scan to Pay</p>
-                <img src="${qrCodeUrl}" width="140" height="140" style="margin: 6px auto; display: block;" />
-                <p style="font-size: 11px; margin: 3px 0; font-weight: 700;">UPI: ${upiId}</p>
-                <p style="font-size: 12px; margin: 6px 0 2px 0; font-weight: 800;">Thanks for purchasing!</p>
-                <p style="font-size: 12px; margin: 0 0 4px 0;">Visit Again Soon 🍨</p>
-                <p style="font-size: 10.5px; margin-top: 6px; font-weight: 700; letter-spacing: 0.5px;">Powered by CocoBae</p>
+              <div class="center" style="margin-top: 8px;">
+                <p style="font-size: 13px; font-weight: 900; margin-bottom: 6px; letter-spacing: 0.5px;">SCAN TO PAY VIA ANY UPI APP</p>
+                <img src="${qrCodeUrl}" width="160" height="160" style="margin: 0 auto; display: block;" />
+                <p style="font-size: 12px; margin: 6px 0 2px 0; font-weight: 800;">UPI ID: ${upiId}</p>
+                <p style="font-size: 13px; margin: 8px 0 2px 0; font-weight: 800;">Thanks for visiting CocoBae!</p>
+                <p style="font-size: 12px; margin: 0 0 4px 0; font-weight: 600;">Visit Again Soon &#127848;</p>
+                <p style="font-size: 11px; margin-top: 6px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;">Powered by CocoBae</p>
               </div>
             </div>
           </body>
