@@ -96,13 +96,13 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
                 width: 100%;
                 max-width: 100%;
                 margin: 0 auto;
-                padding: 6px 4px 16px 4px;
+                padding: 4px 6px 14px 4px;
                 color: #000;
                 background: #fff;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                font-family: 'Courier New', Courier, monospace;
                 font-size: 13px;
-                line-height: 1.35;
-                -webkit-font-smoothing: none;
+                font-weight: 700;
+                line-height: 1.3;
               }
               .receipt-wrapper {
                 width: 100%;
@@ -113,46 +113,48 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
                 text-align: center;
               }
               .bold {
-                font-weight: 800;
+                font-weight: 900;
               }
               .divider {
                 border-top: 2px dashed #000;
-                margin: 8px 0;
+                margin: 6px 0;
                 width: 100%;
               }
               .heavy-divider {
                 border-top: 3px double #000;
-                margin: 8px 0;
+                margin: 7px 0;
                 width: 100%;
               }
               table {
                 width: 100%;
                 border-collapse: collapse;
+                table-layout: fixed;
               }
               th {
-                font-weight: 800;
-                font-size: 13px;
+                font-weight: 900;
+                font-size: 12.5px;
                 color: #000;
               }
               td {
                 color: #000;
+                word-wrap: break-word;
               }
             </style>
           </head>
           <body>
             <div class="receipt-wrapper">
               <div class="center">
-                <h1 style="margin: 0; font-size: 26px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">${cafeName}</h1>
-                <p style="margin: 4px 0 2px 0; font-size: 11.5px; font-weight: 600; line-height: 1.35;">${storeAddress}</p>
-                <p style="margin: 3px 0; font-size: 12.5px; font-weight: 800;">${storeCity} &bull; Ph: ${storePhone}</p>
-                <div style="margin: 6px auto; display: inline-block; border: 1.5px solid #000; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
+                <h1 style="margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 0.5px;">${cafeName}</h1>
+                <p style="margin: 3px 0 2px 0; font-size: 11px; font-weight: 700; line-height: 1.25;">${storeAddress}</p>
+                <p style="margin: 2px 0; font-size: 12px; font-weight: 800;">${storeCity} &bull; Ph: ${storePhone}</p>
+                <div style="margin: 4px auto; display: inline-block; border: 1.5px solid #000; padding: 1px 6px; border-radius: 3px; font-size: 10.5px; font-weight: 800; text-transform: uppercase;">
                   Official Tax Invoice
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; margin-top: 4px;">
+                <div style="display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 700; margin-top: 4px;">
                   <span>Inv: #${order.order_number}</span>
                   <span>${formattedDate}</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; margin-top: 2px;">
+                <div style="display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 700; margin-top: 2px;">
                   <span>Cust: ${order.customer_name || "Walk-In"}</span>
                   ${order.customer_phone ? `<span>Ph: ${order.customer_phone}</span>` : `<span>Pay: ${(order.payment_method || "UPI").toUpperCase()}</span>`}
                 </div>
@@ -163,10 +165,10 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
               <table>
                 <thead>
                   <tr style="border-bottom: 1.5px solid #000;">
-                    <th style="text-align: left; padding: 4px 0;">Item</th>
-                    <th style="text-align: center; padding: 4px 0; width: 40px;">Qty</th>
-                    <th style="text-align: right; padding: 4px 0;">Price</th>
-                    <th style="text-align: right; padding: 4px 0;">Total</th>
+                    <th style="text-align: left; padding: 3px 0; width: 44%;">Item</th>
+                    <th style="text-align: center; padding: 3px 0; width: 14%;">Qty</th>
+                    <th style="text-align: right; padding: 3px 0; width: 21%;">Price</th>
+                    <th style="text-align: right; padding: 3px 0; width: 21%;">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -174,10 +176,10 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
                     .map(
                       (it) => `
                     <tr>
-                      <td style="padding: 5px 0; font-size: 13px; font-weight: 700; text-align: left;">${it.product_name}</td>
-                      <td style="padding: 5px 0; font-size: 13px; font-weight: 800; text-align: center;">${it.quantity}</td>
-                      <td style="padding: 5px 0; font-size: 13px; font-weight: 600; text-align: right;">${it.unit_price.toFixed(2)}</td>
-                      <td style="padding: 5px 0; font-size: 13px; font-weight: 800; text-align: right;">${it.subtotal.toFixed(2)}</td>
+                      <td style="padding: 4px 0; font-size: 12px; font-weight: 800; text-align: left;">${it.product_name}</td>
+                      <td style="padding: 4px 0; font-size: 12px; font-weight: 800; text-align: center;">${it.quantity}</td>
+                      <td style="padding: 4px 0; font-size: 12px; font-weight: 700; text-align: right;">${it.unit_price.toFixed(2)}</td>
+                      <td style="padding: 4px 0; font-size: 12px; font-weight: 800; text-align: right;">${it.subtotal.toFixed(2)}</td>
                     </tr>
                   `,
                     )
