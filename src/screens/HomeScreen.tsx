@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Vibration,
 } from "react-native";
 import { THEME } from "../theme/tokens";
 import { useBreakpoint } from "../theme/breakpoints";
@@ -336,9 +337,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     offerBadge={offerBadge}
                     discountedPrice={discountedPrice}
                     onPress={() => handleOpenProduct(item)}
-                    onAddQuick={() => addItem(item, 1)}
-                    onIncrease={() => updateQuantity(item.id, 1)}
-                    onDecrease={() => updateQuantity(item.id, -1)}
+                    onAddQuick={() => {
+                      Vibration.vibrate(15);
+                      addItem(item, 1);
+                    }}
+                    onIncrease={() => {
+                      Vibration.vibrate(15);
+                      updateQuantity(item.id, 1);
+                    }}
+                    onDecrease={() => {
+                      Vibration.vibrate(15);
+                      updateQuantity(item.id, -1);
+                    }}
                     style={{ width: cardWidth }}
                   />
                 );

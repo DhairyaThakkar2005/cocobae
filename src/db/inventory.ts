@@ -114,3 +114,70 @@ export async function deleteInventoryItem(id: number): Promise<void> {
     });
   }
 }
+
+export async function deductInventoryForOrder(
+  cartItems: { product_name: string; quantity: number }[],
+): Promise<void> {
+  try {
+    const db = await getDB();
+    const allItems = await getInventoryItems();
+    const now = new Date().toISOString();
+
+    let milkDelta = 0;
+    let coffeeDelta = 0;
+    let cocoDelta = 0;
+    let cupsDelta = 0;
+
+    for (const it of cartItems) {
+      const name = it.product_name.toLowerCase();
+      cupsDelta += it.quantity;
+
+      if (
+        name.includes("coffee") ||
+        name.includes("latte") ||
+        name.includes("cappuccino")
+      ) {
+        coffeeDelta += 0.02 * it.quantity;
+        milkDelta += 0.2 * it.quantity;
+      } else if (name.includes("coco") || name.includes("chocolate")) {
+        cocoDelta += 0.03 * it.quantity;
+        milkDelta += 0.25 * it.quantity;
+      } else if (name.includes("shake") || name.includes("frappe")) {
+        milkDelta += 0.3 * it.quantity;
+      }
+    }
+
+    for (const inv of allItems) {
+      const invName = inv.name.toLowerCase();
+      let deduct = 0;
+      if (invName.includes("milk")) deduct = milkDelta;
+      else if (invName.includes("coffee")) deduct = coffeeDelta;
+      else if (invName.includes("coco")) deduct = cocoDelta;
+      else if (invName.includes("cup")) deduct = cupsDelta;
+
+      if (deduct > 0) {
+        const newStock = Math.max(
+          0,
+          Math.round((inv.current_stock - deduct) * 100) / 100,
+        );
+        const sql = `UPDATE inventory_items SET current_stock = ?, updated_at = ? WHERE id = ?`;
+        if (typeof db.runAsync === "function") {
+          await db.runAsync(sql, [newStock, now, inv.id]);
+        } else {
+          await new Promise((resolve) => {
+            db.transaction((tx: any) => {
+              tx.executeSql(
+                sql,
+                [newStock, now, inv.id],
+                () => resolve(true),
+                () => resolve(false),
+              );
+            });
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Inventory deduction error:", e);
+  }
+}

@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Vibration,
 } from "react-native";
 import { THEME } from "../theme/tokens";
 import { useCartStore } from "../store/cartStore";
@@ -15,6 +16,7 @@ import { createOrder, Order } from "../db/orders";
 import { getAllSettings } from "../db/settings";
 import { Offer, getActiveOffers } from "../db/offers";
 import { Customer, getCustomerByPhone, recordCustomerVisit } from "../db/customers";
+import { deductInventoryForOrder } from "../db/inventory";
 import { generateInvoicePdf, shareInvoicePdf } from "../lib/pdfInvoice";
 import { formatINR } from "../lib/utils";
 import {
@@ -228,6 +230,9 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
 
       const created = await createOrder(orderPayload, itemsPayload);
 
+      // Deduct raw material ingredients from kitchen inventory
+      deductInventoryForOrder(itemsPayload).catch(() => {});
+
       // Record CRM customer visit
       if (customerPhone.trim().length >= 10) {
         recordCustomerVisit(customerPhone.trim(), customerName.trim(), grandTotal).catch(() => {});
@@ -236,6 +241,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       // Attach order items to created object
       created.items = itemsPayload;
 
+      Vibration.vibrate([0, 40, 60, 40]);
       clearCart();
       setSuccessOrder(created);
     } catch (e: any) {
@@ -730,11 +736,11 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     <Sparkles size={16} color="#D97706" />
                     <Text style={{ color: "#D97706", fontSize: 13, fontWeight: "900" }}>
-                      Repeat Customer: {customerRecord.name || "Valued Guest"}
+                      Welcome back, {customerRecord.name || "Valued Guest"}!
                     </Text>
                   </View>
                   <Text style={{ color: THEME.colors.textMuted, fontSize: 11, marginTop: 2 }}>
-                    Visit #{customerRecord.visit_count + 1} &bull; Total Spent: {formatINR(customerRecord.total_spent)}
+                    Visit #{customerRecord.visit_count + 1} &bull; Lifetime Spend: {formatINR(customerRecord.total_spent)}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -743,7 +749,10 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                     handleDiscountInputChange("10");
                   }}
                   style={{
-                    backgroundColor: "#D97706",
+                    backgroundColor:
+                      discountValue === 10 && discountMode === "percentage"
+                        ? "#10B981"
+                        : "#D97706",
                     paddingVertical: 6,
                     paddingHorizontal: 10,
                     borderRadius: 8,
@@ -755,7 +764,9 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                   }}
                 >
                   <Text style={{ color: "#FFFFFF", fontSize: 11, fontWeight: "800" }}>
-                    Apply 10% Off
+                    {discountValue === 10 && discountMode === "percentage"
+                      ? "✓ 10% Applied"
+                      : "1-Tap 10% Off"}
                   </Text>
                 </TouchableOpacity>
               </View>
