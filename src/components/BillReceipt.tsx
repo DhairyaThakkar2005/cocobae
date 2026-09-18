@@ -158,10 +158,7 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
                 <h1 style="margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 0.5px;">${cafeName}</h1>
                 <p style="margin: 3px 0 2px 0; font-size: 11px; font-weight: 700; line-height: 1.25;">${storeAddress}</p>
                 <p style="margin: 2px 0; font-size: 12px; font-weight: 800;">${storeCity} &bull; Ph: ${storePhone}</p>
-                <div style="margin: 4px auto; display: inline-block; border: 1.5px solid #000; padding: 1px 6px; border-radius: 3px; font-size: 10.5px; font-weight: 800; text-transform: uppercase;">
-                  Official Tax Invoice
-                </div>
-                <div style="display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 700; margin-top: 4px;">
+                <div style="display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 700; margin-top: 6px;">
                   <span>Inv: #${order.order_number}</span>
                   <span>${formattedDate}</span>
                 </div>
@@ -175,11 +172,11 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
 
               <table>
                 <thead>
-                  <tr style="border-bottom: 1.5px solid #000;">
-                    <th style="text-align: left; padding: 3px 0; width: 44%;">Item</th>
-                    <th style="text-align: center; padding: 3px 0; width: 14%;">Qty</th>
-                    <th style="text-align: right; padding: 3px 0; width: 21%;">Price</th>
-                    <th style="text-align: right; padding: 3px 0; width: 21%;">Total</th>
+                  <tr style="border-bottom: 2px dashed #000;">
+                    <th style="text-align: left; padding: 3px 0 5px 0; width: 44%;">Item</th>
+                    <th style="text-align: center; padding: 3px 0 5px 0; width: 14%;">Qty</th>
+                    <th style="text-align: right; padding: 3px 0 5px 0; width: 21%;">Price</th>
+                    <th style="text-align: right; padding: 3px 0 5px 0; width: 21%;">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -419,18 +416,6 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
             }}
           >
             {storeCity} • Contact: {storePhone}
-          </Text>
-          <Text
-            style={{
-              color: THEME.colors.primary,
-              fontSize: 11,
-              fontWeight: "700",
-              letterSpacing: 1,
-              textTransform: "uppercase",
-              marginTop: 4,
-            }}
-          >
-            Official Tax Invoice
           </Text>
         </View>
 
