@@ -84,7 +84,6 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
               @page {
-                size: 80mm auto;
                 margin: 0;
               }
               * {
@@ -95,8 +94,9 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
               }
               html, body {
                 width: 100%;
+                max-width: 100%;
                 margin: 0 auto;
-                padding: 4px 6px;
+                padding: 4px 8px;
                 color: #000;
                 background: #fff;
                 font-family: 'Courier New', Courier, monospace;
