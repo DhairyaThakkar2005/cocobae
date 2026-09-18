@@ -14,7 +14,7 @@ import { THEME } from "../theme/tokens";
 import { useCartStore } from "../store/cartStore";
 import { createOrder, Order } from "../db/orders";
 import { getAllSettings } from "../db/settings";
-import { Offer, getActiveOffers } from "../db/offers";
+import { Offer, getActiveOffers, findBestOfferForCart, isItemEligibleForOffer } from "../db/offers";
 import { Customer, getCustomerByPhone, recordCustomerVisit } from "../db/customers";
 import { deductInventoryForOrder } from "../db/inventory";
 import { generateInvoicePdf, shareInvoicePdf } from "../lib/pdfInvoice";
@@ -70,6 +70,8 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     getDiscountAmount,
     deliveryCharge,
     setDeliveryCharge,
+    extraChargeName,
+    setExtraChargeName,
     clearCart,
   } = useCartStore();
 
@@ -85,6 +87,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   const [discountMode, setDiscountMode] = useState<"percentage" | "flat">("percentage");
   const [discountInput, setDiscountInput] = useState("");
   const [deliveryInput, setDeliveryInput] = useState(deliveryCharge > 0 ? deliveryCharge.toString() : "");
+  const [chargeNameInput, setChargeNameInput] = useState(extraChargeName || "Delivery Charge");
   const [customerRecord, setCustomerRecord] = useState<Customer | null>(null);
 
   const [storeSettings, setStoreSettings] = useState<{
@@ -103,8 +106,17 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   });
 
   useEffect(() => {
-    getActiveOffers().then(setActiveOffers);
-  }, []);
+    getActiveOffers().then((offers) => {
+      setActiveOffers(offers);
+      // Automatically apply the best active offer if cashier hasn't typed manual discount
+      if (discountType === "none" || !selectedOffer) {
+        const { bestOffer } = findBestOfferForCart(items, offers);
+        if (bestOffer) {
+          setOffer(bestOffer);
+        }
+      }
+    });
+  }, [items]);
 
   useEffect(() => {
     if (customerPhone.trim().length >= 10) {
@@ -218,6 +230,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         discount_value: selectedOffer ? selectedOffer.discount_value : discountValue,
         discount_amount: discountAmount,
         delivery_charge: deliveryCharge || 0,
+        extra_charge_name: chargeNameInput.trim() || extraChargeName || "Delivery Charge",
       };
 
       const itemsPayload = items.map((it) => ({
@@ -1051,7 +1064,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
             ) : null}
           </View>
 
-          {/* Delivery & Parcel Charges Card */}
+          {/* Extra / Delivery / Packaging Charges Card */}
           <View
             style={{
               backgroundColor: THEME.colors.surface,
@@ -1078,7 +1091,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                     fontWeight: "700",
                   }}
                 >
-                  Delivery / Parcel Charge
+                  Extra Charges (Delivery / Packaging)
                 </Text>
               </View>
               {deliveryCharge > 0 ? (
@@ -1113,16 +1126,104 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 marginBottom: 12,
               }}
             >
-              Add packing or delivery charges to this order.
+              Add packing, delivery, or custom service charges to this order.
+            </Text>
+
+            {/* Charge Name Selection & Input */}
+            <View style={{ marginBottom: 12 }}>
+              <Text
+                style={{
+                  color: THEME.colors.textMuted,
+                  fontSize: 11,
+                  fontWeight: "700",
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                  marginBottom: 6,
+                }}
+              >
+                Charge Name
+              </Text>
+              <View style={{ flexDirection: "row", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+                {["Delivery Charge", "Packaging Charge", "Parcel Charge", "Service Charge"].map((preset) => {
+                  const isSelected = chargeNameInput.trim().toLowerCase() === preset.toLowerCase();
+                  return (
+                    <TouchableOpacity
+                      key={preset}
+                      onPress={() => {
+                        setChargeNameInput(preset);
+                        setExtraChargeName(preset);
+                      }}
+                      style={{
+                        backgroundColor: isSelected ? THEME.colors.primary : THEME.colors.surface2,
+                        borderColor: isSelected ? THEME.colors.primary : THEME.colors.border,
+                        borderWidth: 1,
+                        borderRadius: THEME.radius.full,
+                        paddingVertical: 5,
+                        paddingHorizontal: 12,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: isSelected ? "#FFFFFF" : THEME.colors.text,
+                          fontSize: 12,
+                          fontWeight: "700",
+                        }}
+                      >
+                        {preset}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <View
+                style={{
+                  backgroundColor: THEME.colors.surface2,
+                  borderRadius: THEME.radius.md,
+                  borderWidth: 1,
+                  borderColor: THEME.colors.border,
+                  paddingHorizontal: 12,
+                }}
+              >
+                <TextInput
+                  value={chargeNameInput}
+                  onChangeText={(text) => {
+                    setChargeNameInput(text);
+                    setExtraChargeName(text);
+                  }}
+                  placeholder="Charge Name (e.g. Delivery Charge, Container Fee)"
+                  placeholderTextColor={THEME.colors.textDisabled}
+                  style={{
+                    color: THEME.colors.text,
+                    fontSize: 13,
+                    fontWeight: "600",
+                    paddingVertical: 8,
+                  }}
+                />
+              </View>
+            </View>
+
+            {/* Charge Amount Section */}
+            <Text
+              style={{
+                color: THEME.colors.textMuted,
+                fontSize: 11,
+                fontWeight: "700",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+                marginBottom: 6,
+              }}
+            >
+              Charge Amount (₹)
             </Text>
 
             {/* Quick Delivery Charge Pills */}
             <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
               {[
                 { label: "No Charge", val: 0 },
-                { label: "₹30 Delivery", val: 30 },
-                { label: "₹40 Delivery", val: 40 },
-                { label: "₹50 Delivery", val: 50 },
+                { label: "₹20", val: 20 },
+                { label: "₹30", val: 30 },
+                { label: "₹40", val: 40 },
+                { label: "₹50", val: 50 },
               ].map((pill) => {
                 const isSelected = deliveryCharge === pill.val;
                 return (
@@ -1186,7 +1287,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
               <TextInput
                 value={deliveryInput}
                 onChangeText={handleDeliveryInputChange}
-                placeholder="Custom delivery charge (e.g. 45)"
+                placeholder="Custom amount (e.g. 45)"
                 placeholderTextColor={THEME.colors.textDisabled}
                 keyboardType="numeric"
                 style={{

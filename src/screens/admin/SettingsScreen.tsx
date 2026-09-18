@@ -65,6 +65,7 @@ import {
   Offer,
 } from "../../db/offers";
 import { getCategories, Category } from "../../db/categories";
+import { getProducts, Product } from "../../db/products";
 import {
   getInventoryItems,
   updateStock,
@@ -108,11 +109,16 @@ export const SettingsScreen: React.FC = () => {
   // Offers & Promotions State
   const [offers, setOffers] = useState<Offer[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [productsList, setProductsList] = useState<Product[]>([]);
   const [showAddOffer, setShowAddOffer] = useState(false);
   const [newOfferTitle, setNewOfferTitle] = useState("");
-  const [newOfferType, setNewOfferType] = useState<"percentage" | "flat" | "category_discount" | "b1g1">("percentage");
-  const [newOfferVal, setNewOfferVal] = useState("10");
+  const [newOfferType, setNewOfferType] = useState<"bxgy" | "percentage" | "flat">("bxgy");
+  const [newOfferScope, setNewOfferScope] = useState<"store" | "category" | "product">("category");
   const [newOfferCategory, setNewOfferCategory] = useState<number | null>(null);
+  const [newOfferProduct, setNewOfferProduct] = useState<number | null>(null);
+  const [newOfferBuyQty, setNewOfferBuyQty] = useState("1");
+  const [newOfferGetQty, setNewOfferGetQty] = useState("1");
+  const [newOfferVal, setNewOfferVal] = useState("50");
   const [newOfferMinOrder, setNewOfferMinOrder] = useState("0");
 
   // Raw Material Inventory State
@@ -133,7 +139,7 @@ export const SettingsScreen: React.FC = () => {
 
   const loadSettingsAndBackups = async () => {
     try {
-      const [settings, files, logs, offerList, catList, invList, custList] =
+      const [settings, files, logs, offerList, catList, invList, custList, prodList] =
         await Promise.all([
           getAllSettings(),
           getBackupFiles(),
@@ -142,7 +148,14 @@ export const SettingsScreen: React.FC = () => {
           getCategories(),
           getInventoryItems(),
           getAllCustomers(),
+          getProducts(),
         ]);
+
+      setProductsList(prodList || []);
+      setOffers(offerList || []);
+      setCategories(catList || []);
+      setInventory(invList || []);
+      setCustomers(custList || []);
 
       if (settings.cafe_name) setCafeName(settings.cafe_name);
       if (settings.store_address) setStoreAddress(settings.store_address);
@@ -236,23 +249,34 @@ export const SettingsScreen: React.FC = () => {
       Alert.alert("Validation", "Please enter an offer title.");
       return;
     }
-    const val = parseFloat(newOfferVal) || 0;
+    const buyQty = Math.max(1, parseInt(newOfferBuyQty, 10) || 1);
+    const getQty = Math.max(1, parseInt(newOfferGetQty, 10) || 1);
+    let computedVal = parseFloat(newOfferVal) || 0;
+    if (newOfferType === "bxgy") {
+      computedVal = Math.round((getQty / (buyQty + getQty)) * 100);
+    }
     const minOrder = parseFloat(newOfferMinOrder) || 0;
 
     try {
       const created = await createOffer({
         title: newOfferTitle.trim(),
         offer_type: newOfferType,
-        discount_value: val,
-        category_id: newOfferCategory,
+        discount_value: computedVal,
+        buy_qty: buyQty,
+        get_qty: getQty,
+        category_id: newOfferScope === "category" ? newOfferCategory : null,
+        product_id: newOfferScope === "product" ? newOfferProduct : null,
         min_order_amount: minOrder,
         is_active: 1,
       });
       setOffers((prev) => [created, ...prev]);
       setShowAddOffer(false);
       setNewOfferTitle("");
-      setNewOfferVal("10");
+      setNewOfferVal("50");
+      setNewOfferBuyQty("1");
+      setNewOfferGetQty("1");
       setNewOfferCategory(null);
+      setNewOfferProduct(null);
       setNewOfferMinOrder("0");
       Alert.alert("Offer Created", `"${created.title}" is now active!`);
     } catch (e: any) {
@@ -742,18 +766,21 @@ export const SettingsScreen: React.FC = () => {
             justifyContent: "space-between",
             alignItems: "center",
             marginBottom: 8,
+            gap: 8,
           }}
         >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
             <Gift size={16} color={THEME.colors.primary} />
             <Text
+              numberOfLines={1}
               style={{
                 color: THEME.colors.primary,
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: "700",
+                flexShrink: 1,
               }}
             >
-              DISCOUNTS & SPECIAL OFFERS ({offers.length})
+              OFFERS & DISCOUNTS ({offers.length})
             </Text>
           </View>
           <TouchableOpacity
@@ -763,11 +790,12 @@ export const SettingsScreen: React.FC = () => {
               alignItems: "center",
               gap: 4,
               backgroundColor: THEME.colors.primaryGlow,
-              paddingVertical: 4,
+              paddingVertical: 5,
               paddingHorizontal: 10,
               borderRadius: THEME.radius.md,
               borderWidth: 1,
               borderColor: THEME.colors.primary,
+              flexShrink: 0,
             }}
           >
             <Plus size={14} color={THEME.colors.primary} />
@@ -784,7 +812,7 @@ export const SettingsScreen: React.FC = () => {
             marginBottom: 12,
           }}
         >
-          Create percentage discounts, flat rupee off, category-level offers, and B1G1 deals. Active offers automatically adapt products on POS menu and checkout.
+          Create Buy X Get Y (B1G1, B2G1, B1G2), % percentage, or flat ₹ deals. Offers adapt products on menu, cart, checkout, and receipt automatically.
         </Text>
 
         {/* Create New Offer Collapsible Form */}
@@ -814,9 +842,10 @@ export const SettingsScreen: React.FC = () => {
               label="Offer Title"
               value={newOfferTitle}
               onChangeText={setNewOfferTitle}
-              placeholder="e.g. 15% Off Cold Coco / B1G1 Donuts"
+              placeholder="e.g. B1G1 Cold Coco / B2G1 Donuts / 20% Off"
             />
 
+            {/* Target Scope Selector: Storewide, Category, Specific Product */}
             <Text
               style={{
                 color: THEME.colors.textMuted,
@@ -825,25 +854,149 @@ export const SettingsScreen: React.FC = () => {
                 marginBottom: 6,
               }}
             >
-              Offer Type:
+              Applies To (Target Scope):
             </Text>
-            <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+            <View style={{ flexDirection: "row", gap: 6, marginBottom: 10 }}>
               {[
-                { id: "percentage", label: "% Discount" },
-                { id: "flat", label: "Flat ₹ Off" },
-                { id: "category_discount", label: "Category % Off" },
-                { id: "b1g1", label: "B1G1 Free" },
+                { id: "store", label: "Entire Store" },
+                { id: "category", label: "Specific Category" },
+                { id: "product", label: "Specific Product" },
+              ].map((sc) => (
+                <TouchableOpacity
+                  key={sc.id}
+                  onPress={() => setNewOfferScope(sc.id as any)}
+                  style={{
+                    flex: 1,
+                    backgroundColor:
+                      newOfferScope === sc.id
+                        ? THEME.colors.primary
+                        : THEME.colors.surface,
+                    paddingVertical: 6,
+                    alignItems: "center",
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor:
+                      newOfferScope === sc.id
+                        ? THEME.colors.primary
+                        : THEME.colors.border,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color:
+                        newOfferScope === sc.id
+                          ? "#FFFFFF"
+                          : THEME.colors.textMuted,
+                      fontSize: 11,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {sc.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Category Selector if Scope === Category */}
+            {newOfferScope === "category" ? (
+              <View style={{ marginBottom: 12 }}>
+                <Text
+                  style={{
+                    color: THEME.colors.textMuted,
+                    fontSize: 12,
+                    fontWeight: "700",
+                    marginBottom: 6,
+                  }}
+                >
+                  Select Category:
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                  {categories.map((c) => (
+                    <TouchableOpacity
+                      key={c.id}
+                      onPress={() => setNewOfferCategory(c.id)}
+                      style={{
+                        backgroundColor: newOfferCategory === c.id ? THEME.colors.primary : THEME.colors.surface,
+                        paddingVertical: 5,
+                        paddingHorizontal: 12,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: newOfferCategory === c.id ? THEME.colors.primary : THEME.colors.border,
+                      }}
+                    >
+                      <Text style={{ color: newOfferCategory === c.id ? "#FFF" : THEME.colors.text, fontSize: 12, fontWeight: "700" }}>
+                        {c.emoji || "🏷️"} {c.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
+
+            {/* Product Selector if Scope === Product */}
+            {newOfferScope === "product" ? (
+              <View style={{ marginBottom: 12 }}>
+                <Text
+                  style={{
+                    color: THEME.colors.textMuted,
+                    fontSize: 12,
+                    fontWeight: "700",
+                    marginBottom: 6,
+                  }}
+                >
+                  Select Product:
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                  {productsList.map((p) => (
+                    <TouchableOpacity
+                      key={p.id}
+                      onPress={() => setNewOfferProduct(p.id)}
+                      style={{
+                        backgroundColor: newOfferProduct === p.id ? THEME.colors.primary : THEME.colors.surface,
+                        paddingVertical: 5,
+                        paddingHorizontal: 12,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: newOfferProduct === p.id ? THEME.colors.primary : THEME.colors.border,
+                      }}
+                    >
+                      <Text style={{ color: newOfferProduct === p.id ? "#FFF" : THEME.colors.text, fontSize: 12, fontWeight: "700" }}>
+                        {p.name} (₹{p.price})
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
+
+            {/* Offer Type Selector: BxGy, Percentage, Flat */}
+            <Text
+              style={{
+                color: THEME.colors.textMuted,
+                fontSize: 12,
+                fontWeight: "700",
+                marginBottom: 6,
+              }}
+            >
+              Deal Type:
+            </Text>
+            <View style={{ flexDirection: "row", gap: 6, marginBottom: 12 }}>
+              {[
+                { id: "bxgy", label: "Buy X Get Y (BxGy)" },
+                { id: "percentage", label: "% Percentage Off" },
+                { id: "flat", label: "₹ Flat Off" },
               ].map((t) => (
                 <TouchableOpacity
                   key={t.id}
                   onPress={() => setNewOfferType(t.id as any)}
                   style={{
+                    flex: 1,
                     backgroundColor:
                       newOfferType === t.id
                         ? THEME.colors.primary
                         : THEME.colors.surface,
                     paddingVertical: 6,
-                    paddingHorizontal: 10,
+                    alignItems: "center",
                     borderRadius: 8,
                     borderWidth: 1,
                     borderColor:
@@ -868,9 +1021,9 @@ export const SettingsScreen: React.FC = () => {
               ))}
             </View>
 
-            {/* Target Category Selector if category_discount or b1g1 */}
-            {newOfferType === "category_discount" || newOfferType === "b1g1" ? (
-              <View style={{ marginBottom: 10 }}>
+            {/* BxGy Deal Configurator */}
+            {newOfferType === "bxgy" ? (
+              <View style={{ marginBottom: 12 }}>
                 <Text
                   style={{
                     color: THEME.colors.textMuted,
@@ -879,57 +1032,100 @@ export const SettingsScreen: React.FC = () => {
                     marginBottom: 6,
                   }}
                 >
-                  Target Category:
+                  Quick BxGy Presets:
                 </Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                  <TouchableOpacity
-                    onPress={() => setNewOfferCategory(null)}
-                    style={{
-                      backgroundColor: newOfferCategory === null ? THEME.colors.primary : THEME.colors.surface,
-                      paddingVertical: 4,
-                      paddingHorizontal: 10,
-                      borderRadius: 6,
-                      borderWidth: 1,
-                      borderColor: newOfferCategory === null ? THEME.colors.primary : THEME.colors.border,
-                    }}
-                  >
-                    <Text style={{ color: newOfferCategory === null ? "#FFF" : THEME.colors.text, fontSize: 11, fontWeight: "600" }}>
-                      All Categories
-                    </Text>
-                  </TouchableOpacity>
-                  {categories.map((c) => (
-                    <TouchableOpacity
-                      key={c.id}
-                      onPress={() => setNewOfferCategory(c.id)}
-                      style={{
-                        backgroundColor: newOfferCategory === c.id ? THEME.colors.primary : THEME.colors.surface,
-                        paddingVertical: 4,
-                        paddingHorizontal: 10,
-                        borderRadius: 6,
-                        borderWidth: 1,
-                        borderColor: newOfferCategory === c.id ? THEME.colors.primary : THEME.colors.border,
-                      }}
-                    >
-                      <Text style={{ color: newOfferCategory === c.id ? "#FFF" : THEME.colors.text, fontSize: 11, fontWeight: "600" }}>
-                        {c.emoji || "🏷️"} {c.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                <View style={{ flexDirection: "row", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+                  {[
+                    { label: "B1G1", buy: "1", get: "1" },
+                    { label: "B2G1", buy: "2", get: "1" },
+                    { label: "B2G2", buy: "2", get: "2" },
+                    { label: "B1G2", buy: "1", get: "2" },
+                  ].map((preset) => {
+                    const isSelected =
+                      newOfferBuyQty === preset.buy && newOfferGetQty === preset.get;
+                    return (
+                      <TouchableOpacity
+                        key={preset.label}
+                        onPress={() => {
+                          setNewOfferBuyQty(preset.buy);
+                          setNewOfferGetQty(preset.get);
+                        }}
+                        style={{
+                          backgroundColor: isSelected ? THEME.colors.primary : THEME.colors.surface,
+                          paddingVertical: 5,
+                          paddingHorizontal: 12,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: isSelected ? THEME.colors.primary : THEME.colors.border,
+                        }}
+                      >
+                        <Text style={{ color: isSelected ? "#FFF" : THEME.colors.text, fontSize: 12, fontWeight: "700" }}>
+                          {preset.label} Free
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <View style={{ flexDirection: "row", gap: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Input
+                      label="Buy Quantity (X)"
+                      value={newOfferBuyQty}
+                      onChangeText={setNewOfferBuyQty}
+                      keyboardType="numeric"
+                      placeholder="1"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Input
+                      label="Get Free Quantity (Y)"
+                      value={newOfferGetQty}
+                      onChangeText={setNewOfferGetQty}
+                      keyboardType="numeric"
+                      placeholder="1"
+                    />
+                  </View>
+                </View>
+
+                {/* Live Preview Box */}
+                <View
+                  style={{
+                    backgroundColor: "#10B98115",
+                    borderWidth: 1,
+                    borderColor: "#10B98135",
+                    borderRadius: THEME.radius.md,
+                    padding: 10,
+                    marginTop: 6,
+                  }}
+                >
+                  <Text style={{ color: "#10B981", fontSize: 12, fontWeight: "700" }}>
+                    ✨ Calculated: {Math.round(((parseInt(newOfferGetQty, 10) || 1) / ((parseInt(newOfferBuyQty, 10) || 1) + (parseInt(newOfferGetQty, 10) || 1))) * 100)}% off per unit
+                  </Text>
+                  <Text style={{ color: THEME.colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                    Every unit adapts dynamically: 1 item is discounted accordingly on menu & bill!
+                  </Text>
+                </View>
               </View>
             ) : null}
 
-            {newOfferType !== "b1g1" ? (
+            {newOfferType === "percentage" ? (
               <Input
-                label={
-                  newOfferType === "percentage" || newOfferType === "category_discount"
-                    ? "Discount Percentage (%)"
-                    : "Discount Flat Value (₹)"
-                }
+                label="Discount Percentage (%)"
                 value={newOfferVal}
                 onChangeText={setNewOfferVal}
                 keyboardType="numeric"
-                placeholder="10"
+                placeholder="15"
+              />
+            ) : null}
+
+            {newOfferType === "flat" ? (
+              <Input
+                label="Discount Flat Value (₹)"
+                value={newOfferVal}
+                onChangeText={setNewOfferVal}
+                keyboardType="numeric"
+                placeholder="50"
               />
             ) : null}
 
@@ -955,6 +1151,27 @@ export const SettingsScreen: React.FC = () => {
         {/* Offers List */}
         {offers.map((off) => {
           const matchedCategory = categories.find((c) => c.id === off.category_id);
+          const matchedProduct = productsList.find((p) => p.id === off.product_id);
+          const isBxGy = off.offer_type === "bxgy" || off.offer_type === "b1g1";
+          const buyQ = off.buy_qty || 1;
+          const getQ = off.get_qty || 1;
+
+          let targetLabel = "Storewide";
+          if (matchedProduct) {
+            targetLabel = `Product: ${matchedProduct.name}`;
+          } else if (matchedCategory) {
+            targetLabel = `Category: ${matchedCategory.name}`;
+          }
+
+          let dealBadge = "";
+          if (isBxGy) {
+            dealBadge = `B${buyQ}G${getQ} FREE`;
+          } else if (off.offer_type === "percentage" || off.offer_type === "category_discount") {
+            dealBadge = `${off.discount_value}% OFF`;
+          } else {
+            dealBadge = `₹${off.discount_value} OFF`;
+          }
+
           return (
             <View
               key={off.id}
@@ -971,7 +1188,7 @@ export const SettingsScreen: React.FC = () => {
               }}
             >
               <View style={{ flex: 1, marginRight: 10 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   <Text
                     style={{
                       color: THEME.colors.text,
@@ -994,10 +1211,9 @@ export const SettingsScreen: React.FC = () => {
                         color: off.is_active ? "#10B981" : "#9CA3AF",
                         fontSize: 10,
                         fontWeight: "800",
-                        textTransform: "uppercase",
                       }}
                     >
-                      {off.offer_type}
+                      {dealBadge}
                     </Text>
                   </View>
                 </View>
@@ -1005,17 +1221,13 @@ export const SettingsScreen: React.FC = () => {
                   style={{
                     color: THEME.colors.textMuted,
                     fontSize: 11,
-                    marginTop: 2,
+                    marginTop: 3,
                   }}
                 >
-                  {off.offer_type === "b1g1"
-                    ? `Buy 1 Get 1 Free ${matchedCategory ? `on ${matchedCategory.name}` : "Storewide"}`
-                    : off.offer_type === "category_discount"
-                    ? `${off.discount_value}% Off on ${matchedCategory?.name || "Category"}`
-                    : off.offer_type === "percentage"
-                    ? `${off.discount_value}% Off Order`
-                    : `₹${off.discount_value} Flat Off`}
-                  {off.min_order_amount > 0 ? ` &bull; Min ₹${off.min_order_amount}` : ""}
+                  {isBxGy
+                    ? `Buy ${buyQ} Get ${getQ} Free (${Math.round((getQ / (buyQ + getQ)) * 100)}% off per unit) • ${targetLabel}`
+                    : `${dealBadge} on ${targetLabel}`}
+                  {off.min_order_amount > 0 ? ` • Min ₹${off.min_order_amount}` : ""}
                 </Text>
               </View>
 
@@ -1055,18 +1267,21 @@ export const SettingsScreen: React.FC = () => {
             justifyContent: "space-between",
             alignItems: "center",
             marginBottom: 8,
+            gap: 8,
           }}
         >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
             <Layers size={16} color={THEME.colors.primary} />
             <Text
+              numberOfLines={1}
               style={{
                 color: THEME.colors.primary,
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: "700",
+                flexShrink: 1,
               }}
             >
-              RAW MATERIAL INVENTORY ({inventory.length})
+              RAW INVENTORY ({inventory.length})
             </Text>
           </View>
           <TouchableOpacity
@@ -1076,11 +1291,12 @@ export const SettingsScreen: React.FC = () => {
               alignItems: "center",
               gap: 4,
               backgroundColor: THEME.colors.primaryGlow,
-              paddingVertical: 4,
+              paddingVertical: 5,
               paddingHorizontal: 10,
               borderRadius: THEME.radius.md,
               borderWidth: 1,
               borderColor: THEME.colors.primary,
+              flexShrink: 0,
             }}
           >
             <Plus size={14} color={THEME.colors.primary} />

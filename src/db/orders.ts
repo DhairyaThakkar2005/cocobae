@@ -28,10 +28,12 @@ export interface Order {
     | "category_offer"
     | "category_discount"
     | "b1g1"
+    | "bxgy"
     | "offer";
   discount_value?: number;
   discount_amount?: number;
   delivery_charge?: number;
+  extra_charge_name?: string;
   items?: OrderItem[];
 }
 
@@ -44,8 +46,8 @@ export async function createOrder(
   const orderDate = new Date().toISOString();
 
   const insertOrderSql = `
-    INSERT INTO orders (order_number, order_date, total_amount, gst_amount, payment_method, customer_name, customer_phone, note, status, discount_type, discount_value, discount_amount, delivery_charge)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO orders (order_number, order_date, total_amount, gst_amount, payment_method, customer_name, customer_phone, note, status, discount_type, discount_value, discount_amount, delivery_charge, extra_charge_name)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   const orderParams = [
     orderNumber,
@@ -61,6 +63,7 @@ export async function createOrder(
     order.discount_value || 0,
     order.discount_amount || 0,
     order.delivery_charge || 0,
+    order.extra_charge_name || "Delivery Charge",
   ];
 
   let orderId: number;
@@ -261,6 +264,10 @@ export async function updateOrder(
   if (orderData.delivery_charge !== undefined) {
     fields.push("delivery_charge = ?");
     params.push(orderData.delivery_charge);
+  }
+  if (orderData.extra_charge_name !== undefined) {
+    fields.push("extra_charge_name = ?");
+    params.push(orderData.extra_charge_name);
   }
 
   if (fields.length > 0) {

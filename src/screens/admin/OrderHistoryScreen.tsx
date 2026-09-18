@@ -1116,7 +1116,7 @@ export const OrderHistoryScreen: React.FC = () => {
                       marginBottom: 4,
                     }}
                   >
-                    Delivery Charge (₹)
+                    {editingOrder?.extra_charge_name || "Delivery Charge"} (₹)
                   </Text>
                   <TextInput
                     value={editDeliveryCharge}
@@ -1191,7 +1191,7 @@ export const OrderHistoryScreen: React.FC = () => {
                   }}
                 >
                   <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
-                    Delivery Charge
+                    {editingOrder?.extra_charge_name || "Delivery Charge"}
                   </Text>
                   <Text style={{ color: THEME.colors.text, fontSize: 13, fontWeight: "700" }}>
                     +{formatINR(parsedDeliv)}

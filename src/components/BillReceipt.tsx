@@ -213,7 +213,7 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
                 ${
                   order.delivery_charge && order.delivery_charge > 0
                     ? `<tr>
-                        <td style="padding: 3px 0; font-size: 13px; font-weight: 700;">Delivery Charge:</td>
+                        <td style="padding: 3px 0; font-size: 13px; font-weight: 700;">${order.extra_charge_name || "Delivery Charge"}:</td>
                         <td style="text-align: right; padding: 3px 0; font-size: 13px; font-weight: 700;">+Rs. ${Math.round(order.delivery_charge)}</td>
                       </tr>`
                     : ""
@@ -644,7 +644,7 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
               style={{ flexDirection: "row", justifyContent: "space-between" }}
             >
               <Text style={{ color: THEME.colors.textMuted, fontSize: 13 }}>
-                Delivery Charge:
+                {order.extra_charge_name || "Delivery Charge"}:
               </Text>
               <Text
                 style={{

@@ -21,6 +21,7 @@ interface CartStore {
   discountValue: number;
   selectedOffer: Offer | null;
   deliveryCharge: number;
+  extraChargeName: string;
 
   setSettings: (gstEnabled: boolean, gstPercent: number) => void;
   setCustomerName: (name: string) => void;
@@ -30,6 +31,7 @@ interface CartStore {
   setOffer: (offer: Offer | null) => void;
   clearDiscount: () => void;
   setDeliveryCharge: (charge: number) => void;
+  setExtraChargeName: (name: string) => void;
 
   addItem: (product: Product, quantity?: number, note?: string) => void;
   updateQuantity: (productId: number, delta: number) => void;
@@ -57,6 +59,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
   discountValue: 0,
   selectedOffer: null,
   deliveryCharge: 0,
+  extraChargeName: "Delivery Charge",
 
   setSettings: (gstEnabled, gstPercent) => set({ gstEnabled, gstPercent }),
   setCustomerName: (customerName) => set({ customerName }),
@@ -79,6 +82,8 @@ export const useCartStore = create<CartStore>((set, get) => ({
     set({ discountType: "none", discountValue: 0, selectedOffer: null }),
   setDeliveryCharge: (charge: number) =>
     set({ deliveryCharge: Math.max(0, Math.round(charge || 0)) }),
+  setExtraChargeName: (name: string) =>
+    set({ extraChargeName: name || "Delivery Charge" }),
 
   addItem: (product, quantity = 1, note = "") => {
     set((state) => {
@@ -171,6 +176,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
       discountValue: 0,
       selectedOffer: null,
       deliveryCharge: 0,
+      extraChargeName: "Delivery Charge",
     });
   },
 

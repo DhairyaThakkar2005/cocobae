@@ -117,7 +117,7 @@ export async function generateInvoicePdf(
           ${
             order.delivery_charge && order.delivery_charge > 0
               ? `<div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
-                  <span>Delivery Charge:</span>
+                  <span>${order.extra_charge_name || "Delivery Charge"}:</span>
                   <span>+Rs. ${Math.round(order.delivery_charge)}</span>
                 </div>`
               : ""

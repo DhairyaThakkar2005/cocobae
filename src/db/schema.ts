@@ -60,7 +60,9 @@ export async function initDatabase() {
       status TEXT DEFAULT 'completed',
       discount_type TEXT DEFAULT 'none',
       discount_value REAL DEFAULT 0,
-      discount_amount REAL DEFAULT 0
+      discount_amount REAL DEFAULT 0,
+      delivery_charge REAL DEFAULT 0,
+      extra_charge_name TEXT DEFAULT 'Delivery Charge'
     );
 
     CREATE TABLE IF NOT EXISTS order_items (
@@ -78,7 +80,10 @@ export async function initDatabase() {
       title TEXT NOT NULL,
       offer_type TEXT NOT NULL,
       discount_value REAL DEFAULT 0,
+      buy_qty INTEGER DEFAULT 1,
+      get_qty INTEGER DEFAULT 1,
       category_id INTEGER,
+      product_id INTEGER,
       min_order_amount REAL DEFAULT 0,
       is_active INTEGER DEFAULT 1,
       created_at TEXT
@@ -126,6 +131,10 @@ export async function initDatabase() {
     "ALTER TABLE orders ADD COLUMN discount_value REAL DEFAULT 0;",
     "ALTER TABLE orders ADD COLUMN discount_amount REAL DEFAULT 0;",
     "ALTER TABLE orders ADD COLUMN delivery_charge REAL DEFAULT 0;",
+    "ALTER TABLE orders ADD COLUMN extra_charge_name TEXT DEFAULT 'Delivery Charge';",
+    "ALTER TABLE offers ADD COLUMN product_id INTEGER;",
+    "ALTER TABLE offers ADD COLUMN buy_qty INTEGER DEFAULT 1;",
+    "ALTER TABLE offers ADD COLUMN get_qty INTEGER DEFAULT 1;",
   ];
 
   if (typeof db.execAsync === "function") {
