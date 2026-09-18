@@ -200,12 +200,12 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
               <table>
                 <tr>
                   <td style="padding: 3px 0; font-size: 13px; font-weight: 700;">Sub Total:</td>
-                  <td style="text-align: right; padding: 3px 0; font-size: 13px; font-weight: 700;">Rs. ${Math.round((order.items || []).reduce((acc, it) => acc + it.subtotal, 0))}</td>
+                  <td style="text-align: right; padding: 3px 0; font-size: 13px; font-weight: 700;">Rs. ${Math.round((order.items && order.items.length > 0) ? order.items.reduce((acc, it) => acc + it.subtotal, 0) : Math.max(0, order.total_amount + (order.discount_amount || 0) - (order.delivery_charge || 0) - (order.gst_amount || 0)))}</td>
                 </tr>
                 ${
                   order.discount_amount && order.discount_amount > 0
                     ? `<tr>
-                        <td style="padding: 3px 0; font-size: 13px; font-weight: 700;">Discount ${order.discount_type === "percentage" ? `(${order.discount_value}%)` : ""}:</td>
+                        <td style="padding: 3px 0; font-size: 13px; font-weight: 700;">Discount ${order.discount_type === "percentage" ? `(${order.discount_value}%)` : order.discount_type === "bxgy" || order.discount_type === "offer" ? "(Offer)" : order.discount_type === "flat" ? "(Flat)" : ""}:</td>
                         <td style="text-align: right; padding: 3px 0; font-size: 13px; font-weight: 700;">-Rs. ${Math.round(order.discount_amount)}</td>
                       </tr>`
                     : ""
@@ -603,29 +603,43 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
 
         {/* Totals */}
         <View style={{ gap: 4, marginBottom: 14 }}>
-          <View
-            style={{ flexDirection: "row", justifyContent: "space-between" }}
-          >
-            <Text style={{ color: THEME.colors.textMuted, fontSize: 13 }}>
-              Sub Total:
-            </Text>
-            <Text
-              style={{
-                color: THEME.colors.text,
-                fontSize: 13,
-                fontWeight: "600",
-              }}
-            >
-              {formatINR((order.items || []).reduce((acc, it) => acc + it.subtotal, 0))}
-            </Text>
-          </View>
+          {(() => {
+            const receiptSubtotal =
+              order.items && order.items.length > 0
+                ? order.items.reduce((acc, it) => acc + it.subtotal, 0)
+                : Math.max(
+                    0,
+                    order.total_amount +
+                      (order.discount_amount || 0) -
+                      (order.delivery_charge || 0) -
+                      (order.gst_amount || 0),
+                  );
+            return (
+              <View
+                style={{ flexDirection: "row", justifyContent: "space-between" }}
+              >
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 13 }}>
+                  Sub Total:
+                </Text>
+                <Text
+                  style={{
+                    color: THEME.colors.text,
+                    fontSize: 13,
+                    fontWeight: "600",
+                  }}
+                >
+                  {formatINR(receiptSubtotal)}
+                </Text>
+              </View>
+            );
+          })()}
 
           {order.discount_amount && order.discount_amount > 0 ? (
             <View
               style={{ flexDirection: "row", justifyContent: "space-between" }}
             >
               <Text style={{ color: THEME.colors.danger || "#EF4444", fontSize: 13, fontWeight: "600" }}>
-                Discount {order.discount_type === "percentage" ? `(${order.discount_value}%)` : ""}:
+                Discount {order.discount_type === "percentage" ? `(${order.discount_value}%)` : order.discount_type === "bxgy" || order.discount_type === "offer" ? "(Offer)" : order.discount_type === "flat" ? "(Flat)" : ""}:
               </Text>
               <Text
                 style={{

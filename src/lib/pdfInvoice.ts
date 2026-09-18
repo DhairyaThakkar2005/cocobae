@@ -104,12 +104,12 @@ export async function generateInvoicePdf(
         <div style="margin-top: 12px; border-top: 1px dashed #333; padding-top: 8px;">
           <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
             <span>Sub Total:</span>
-            <span>Rs. ${Math.round((order.items || []).reduce((acc, it) => acc + it.subtotal, 0))}</span>
+            <span>Rs. ${Math.round((order.items && order.items.length > 0) ? order.items.reduce((acc, it) => acc + it.subtotal, 0) : Math.max(0, order.total_amount + (order.discount_amount || 0) - (order.delivery_charge || 0) - (order.gst_amount || 0)))}</span>
           </div>
           ${
             order.discount_amount && order.discount_amount > 0
               ? `<div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; color: #b91c1c; font-weight: bold;">
-                  <span>Discount ${order.discount_type === "percentage" ? `(${order.discount_value}%)` : ""}:</span>
+                  <span>Discount ${order.discount_type === "percentage" ? `(${order.discount_value}%)` : order.discount_type === "bxgy" || order.discount_type === "offer" ? "(Offer)" : order.discount_type === "flat" ? "(Flat)" : ""}:</span>
                   <span>-Rs. ${Math.round(order.discount_amount)}</span>
                 </div>`
               : ""

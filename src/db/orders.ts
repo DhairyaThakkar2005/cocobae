@@ -126,6 +126,11 @@ export async function createOrder(
     customer_phone: order.customer_phone,
     note: order.note,
     status: "completed",
+    discount_type: order.discount_type || "none",
+    discount_value: order.discount_value || 0,
+    discount_amount: order.discount_amount || 0,
+    delivery_charge: order.delivery_charge || 0,
+    extra_charge_name: order.extra_charge_name || "Extra Charge",
     items: items.map((i) => ({ ...i, order_id: orderId })),
   };
 }

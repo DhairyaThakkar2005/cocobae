@@ -408,29 +408,6 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
               }}
             >
               <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
-                Amount Paid
-              </Text>
-              <Text
-                style={{
-                  color: THEME.colors.primary,
-                  fontSize: 20,
-                  fontWeight: "900",
-                }}
-              >
-                {formatINR(successOrder.total_amount)}
-              </Text>
-            </View>
-
-            <Separator />
-
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
                 Payment Method
               </Text>
               <View
@@ -500,6 +477,57 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
               </View>
             ) : null}
 
+            <Separator />
+
+            {/* Subtotal */}
+            {(() => {
+              const successSubtotal =
+                successOrder.items && successOrder.items.length > 0
+                  ? successOrder.items.reduce((acc, it) => acc + it.subtotal, 0)
+                  : Math.max(
+                      0,
+                      successOrder.total_amount +
+                        (successOrder.discount_amount || 0) -
+                        (successOrder.delivery_charge || 0) -
+                        (successOrder.gst_amount || 0),
+                    );
+              return (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                    Sub Total
+                  </Text>
+                  <Text style={{ color: THEME.colors.text, fontSize: 13, fontWeight: "700" }}>
+                    {formatINR(successSubtotal)}
+                  </Text>
+                </View>
+              );
+            })()}
+
+            {/* Discount if applied */}
+            {successOrder.discount_amount && successOrder.discount_amount > 0 ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#10B981", fontSize: 13, fontWeight: "600" }}>
+                  Discount {successOrder.discount_type === "percentage" ? `(${successOrder.discount_value}%)` : successOrder.discount_type === "bxgy" || successOrder.discount_type === "offer" ? "(Offer)" : "(Flat)"}
+                </Text>
+                <Text style={{ color: "#10B981", fontSize: 13, fontWeight: "700" }}>
+                  -{formatINR(successOrder.discount_amount)}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Extra Charges if applied */}
             {successOrder.delivery_charge && successOrder.delivery_charge > 0 ? (
               <View
                 style={{
@@ -516,6 +544,48 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 </Text>
               </View>
             ) : null}
+
+            {/* GST if applied */}
+            {successOrder.gst_amount && successOrder.gst_amount > 0 ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                  GST Tax
+                </Text>
+                <Text style={{ color: THEME.colors.text, fontSize: 13, fontWeight: "700" }}>
+                  +{formatINR(successOrder.gst_amount)}
+                </Text>
+              </View>
+            ) : null}
+
+            <Separator />
+
+            {/* Amount Paid */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: THEME.colors.text, fontSize: 15, fontWeight: "800" }}>
+                Amount Paid
+              </Text>
+              <Text
+                style={{
+                  color: THEME.colors.primary,
+                  fontSize: 22,
+                  fontWeight: "900",
+                }}
+              >
+                {formatINR(successOrder.total_amount)}
+              </Text>
+            </View>
           </View>
 
           {/* Countdown & Redirect Info */}
