@@ -178,8 +178,8 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
                     <tr>
                       <td style="padding: 4px 0; font-size: 12px; font-weight: 800; text-align: left;">${it.product_name}</td>
                       <td style="padding: 4px 0; font-size: 12px; font-weight: 800; text-align: center;">${it.quantity}</td>
-                      <td style="padding: 4px 0; font-size: 12px; font-weight: 700; text-align: right;">${it.unit_price.toFixed(2)}</td>
-                      <td style="padding: 4px 0; font-size: 12px; font-weight: 800; text-align: right;">${it.subtotal.toFixed(2)}</td>
+                      <td style="padding: 4px 0; font-size: 12px; font-weight: 700; text-align: right;">${Math.round(it.unit_price)}</td>
+                      <td style="padding: 4px 0; font-size: 12px; font-weight: 800; text-align: right;">${Math.round(it.subtotal)}</td>
                     </tr>
                   `,
                     )
@@ -192,13 +192,13 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
               <table>
                 <tr>
                   <td style="padding: 3px 0; font-size: 13px; font-weight: 700;">Sub Total:</td>
-                  <td style="text-align: right; padding: 3px 0; font-size: 13px; font-weight: 700;">Rs. ${(order.total_amount - (order.gst_amount || 0)).toFixed(2)}</td>
+                  <td style="text-align: right; padding: 3px 0; font-size: 13px; font-weight: 700;">Rs. ${Math.round(order.total_amount - (order.gst_amount || 0))}</td>
                 </tr>
                 ${
                   order.gst_amount > 0
                     ? `<tr>
                         <td style="padding: 3px 0; font-size: 13px; font-weight: 700;">GST Tax:</td>
-                        <td style="text-align: right; padding: 3px 0; font-size: 13px; font-weight: 700;">Rs. ${order.gst_amount.toFixed(2)}</td>
+                        <td style="text-align: right; padding: 3px 0; font-size: 13px; font-weight: 700;">Rs. ${Math.round(order.gst_amount)}</td>
                       </tr>`
                     : ""
                 }
@@ -209,7 +209,7 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
               <table style="margin: 4px 0;">
                 <tr style="font-size: 20px; font-weight: 900;">
                   <td style="letter-spacing: 0.5px;">TOTAL:</td>
-                  <td style="text-align: right; font-size: 22px;">Rs. ${order.total_amount.toFixed(2)}</td>
+                  <td style="text-align: right; font-size: 22px;">Rs. ${Math.round(order.total_amount)}</td>
                 </tr>
               </table>
 
@@ -245,7 +245,7 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
           (it) => `
           <tr style="border-bottom: 1px dashed #ddd;">
             <td style="padding: 8px 4px; font-size: 13px;">${it.product_name}</td>
-            <td style="padding: 8px 4px; text-align: right; font-size: 13px;">${it.unit_price.toFixed(2)} x${it.quantity} &nbsp; <b>₹${it.subtotal.toFixed(2)}</b></td>
+            <td style="padding: 8px 4px; text-align: right; font-size: 13px;">${Math.round(it.unit_price)} x${it.quantity} &nbsp; <b>₹${Math.round(it.subtotal)}</b></td>
           </tr>
         `,
         )
@@ -281,19 +281,19 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
             <div style="margin-top: 14px; border-top: 1px dashed #333; padding-top: 10px;">
               <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
                 <span>Sub Total:</span>
-                <span>Rs. ${(order.total_amount - (order.gst_amount || 0)).toFixed(2)}</span>
+                <span>Rs. ${Math.round(order.total_amount - (order.gst_amount || 0))}</span>
               </div>
               ${
                 order.gst_amount > 0
                   ? `<div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
                       <span>GST:</span>
-                      <span>Rs. ${order.gst_amount.toFixed(2)}</span>
+                      <span>Rs. ${Math.round(order.gst_amount)}</span>
                     </div>`
                   : ""
               }
               <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: 900; border-top: 2px dashed #000; border-bottom: 2px dashed #000; padding: 8px 0; margin-top: 8px;">
                 <span>Total Rs :</span>
-                <span>${order.total_amount.toFixed(2)}</span>
+                <span>${Math.round(order.total_amount)}</span>
               </div>
             </div>
 
