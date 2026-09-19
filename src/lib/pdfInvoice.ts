@@ -85,7 +85,7 @@ export async function generateInvoicePdf(
           <h1 style="color: #0F0A06; margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 0.5px;">${cafeName}</h1>
           <p style="color: #444; margin: 4px auto; font-size: 11px; max-width: 360px; line-height: 1.3;">${storeAddress}</p>
           ${fssaiNumber ? `<p style="color: #444; margin: 2px auto; font-size: 11px; font-weight: 700;">FSSAI: ${fssaiNumber}</p>` : ""}
-          <p style="color: #555; margin: 2px 0; font-size: 12px;">${storeCity} • Contact: ${storePhone}</p>
+          <p style="color: #555; margin: 2px 0; font-size: 12px;">Ph: ${storePhone}</p>
           <p style="color: #222; margin: 5px 0 2px 0; font-size: 13px;">Invoice ID: <b>${order.order_number}</b></p>
           <p style="color: #666; font-size: 11px; margin: 2px 0;">Order Time: ${formattedDate}</p>
           <p style="color: #222; font-size: 12px; margin: 3px 0;">Customer Name: <b>${order.customer_name || "Walk In Customer"}</b></p>

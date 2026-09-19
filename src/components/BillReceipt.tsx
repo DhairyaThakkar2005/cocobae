@@ -160,7 +160,7 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
                 <h1 style="margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 0.5px;">${cafeName}</h1>
                 <p style="margin: 3px 0 2px 0; font-size: 11px; font-weight: 700; line-height: 1.25;">${storeAddress}</p>
                 ${fssaiNumber ? `<p style="margin: 2px 0; font-size: 11px; font-weight: 700;">FSSAI: ${fssaiNumber}</p>` : ""}
-                <p style="margin: 2px 0; font-size: 12px; font-weight: 800;">${storeCity} &bull; Ph: ${storePhone}</p>
+                <p style="margin: 2px 0; font-size: 12px; font-weight: 800;">Ph: ${storePhone}</p>
                 <div style="display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 700; margin-top: 6px;">
                   <span>Inv: #${order.order_number}</span>
                   <span>${formattedDate}</span>
@@ -326,7 +326,7 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
               <h1 style="color: #0F0A06; margin: 0; font-size: 22px; font-weight: 900;">${cafeName}</h1>
               <p style="color: #444; margin: 3px auto; font-size: 11px; max-width: 360px; line-height: 1.3;">${storeAddress}</p>
               ${fssaiNumber ? `<p style="color: #444; margin: 2px auto; font-size: 11px; font-weight: 700;">FSSAI: ${fssaiNumber}</p>` : ""}
-              <p style="color: #555; margin: 2px 0; font-size: 12px;">${storeCity} • Contact: ${storePhone}</p>
+              <p style="color: #555; margin: 2px 0; font-size: 12px;">Ph: ${storePhone}</p>
               <p style="color: #333; margin: 4px 0; font-size: 12px;">Invoice ID: <b>${order.order_number}</b></p>
               <p style="color: #666; font-size: 11px; margin: 2px 0;">Order Time: ${formattedDate}</p>
               <p style="color: #333; font-size: 12px; margin: 2px 0;">Customer Name: <b>${order.customer_name || "Walk In Customer"}</b></p>
@@ -538,7 +538,7 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
               marginTop: 2,
             }}
           >
-            {storeCity} • Contact: {storePhone}
+            Ph: {storePhone}
           </Text>
         </View>
 
