@@ -18,6 +18,7 @@ import {
   updateProduct,
   deleteProduct,
   toggleProductAvailability,
+  ensureStockSchema,
   Product,
 } from "../../db/products";
 import { getCategories, Category } from "../../db/categories";
@@ -58,6 +59,9 @@ export const ProductsScreen: React.FC = () => {
   const [formImagePath, setFormImagePath] = useState("");
 
   const loadData = async () => {
+    try {
+      await ensureStockSchema();
+    } catch {}
     const [cats, prods] = await Promise.all([
       getCategories(),
       getProducts(selectedCategoryFilter, search),

@@ -1,4 +1,5 @@
 import { getDB } from "./schema";
+import { ensureStockSchema } from "./products";
 
 export type DatePreset = "today" | "week" | "month" | "custom";
 
@@ -442,6 +443,7 @@ export async function getStockReport(range: DateRange): Promise<{
   totalRestocked: number;
   totalClosing: number;
 }> {
+  await ensureStockSchema();
   const { startBound, endBound } = getQueryDateBounds(range);
 
   // 1. Fetch all products
@@ -552,6 +554,7 @@ export async function getStockReport(range: DateRange): Promise<{
 
 // 7. Report 7: Stock Arrival & Restock History Logs
 export async function getStockArrivalLogs(range?: DateRange): Promise<StockLogItem[]> {
+  await ensureStockSchema();
   let sql = `
     SELECT 
       id,

@@ -1,5 +1,38 @@
 import { getDB } from "./schema";
 
+export async function ensureStockSchema(db?: any): Promise<void> {
+  try {
+    const database = db || (await getDB());
+    const alterQuery = "ALTER TABLE products ADD COLUMN stock_quantity INTEGER DEFAULT 0;";
+    if (typeof database.execAsync === "function") {
+      try {
+        await database.execAsync(alterQuery);
+      } catch {}
+      try {
+        await database.execAsync(`
+          CREATE TABLE IF NOT EXISTS product_stock_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL,
+            product_name TEXT NOT NULL,
+            change_type TEXT NOT NULL,
+            quantity_changed INTEGER NOT NULL,
+            previous_stock INTEGER NOT NULL,
+            new_stock INTEGER NOT NULL,
+            note TEXT,
+            created_at TEXT DEFAULT (datetime('now', 'localtime'))
+          );
+        `);
+      } catch {}
+    } else if (typeof database.runAsync === "function") {
+      try {
+        await database.runAsync(alterQuery);
+      } catch {}
+    }
+  } catch (err) {
+    console.warn("ensureStockSchema notice:", err);
+  }
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -68,6 +101,7 @@ export async function addProduct(
   product: Omit<Product, "id">,
 ): Promise<number> {
   const db = await getDB();
+  await ensureStockSchema(db);
   const sql = `
     INSERT INTO products (name, description, price, category_id, image_path, is_veg, is_available, stock_quantity, sort_order)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -87,8 +121,18 @@ export async function addProduct(
 
   let insertedId: number;
   if (typeof db.runAsync === "function") {
-    const res = await db.runAsync(sql, params);
-    insertedId = res.lastInsertRowId;
+    try {
+      const res = await db.runAsync(sql, params);
+      insertedId = res.lastInsertRowId;
+    } catch (insertErr: any) {
+      if (String(insertErr?.message || "").includes("stock_quantity")) {
+        await ensureStockSchema(db);
+        const res = await db.runAsync(sql, params);
+        insertedId = res.lastInsertRowId;
+      } else {
+        throw insertErr;
+      }
+    }
   } else {
     insertedId = await new Promise((resolve, reject) => {
       db.transaction((tx: any) => {
@@ -127,6 +171,7 @@ export async function updateProduct(
   product: Partial<Product>,
 ): Promise<void> {
   const db = await getDB();
+  await ensureStockSchema(db);
   const stockQty = product.stock_quantity !== undefined ? Math.max(0, Math.round(product.stock_quantity)) : undefined;
 
   let sql = `
@@ -186,8 +231,17 @@ export async function updateProduct(
   params.push(id);
 
   if (typeof db.runAsync === "function") {
-    await db.runAsync(sql, params);
-    return;
+    try {
+      await db.runAsync(sql, params);
+      return;
+    } catch (err: any) {
+      if (String(err?.message || "").includes("stock_quantity")) {
+        await ensureStockSchema(db);
+        await db.runAsync(sql, params);
+        return;
+      }
+      throw err;
+    }
   }
 
   return new Promise((resolve, reject) => {
@@ -208,6 +262,7 @@ export async function updateProductStock(
   note = "Stock Updated",
 ): Promise<void> {
   const db = await getDB();
+  await ensureStockSchema(db);
   const safeStock = Math.max(0, Math.round(newStock || 0));
 
   let prevStock = 0;
@@ -266,6 +321,7 @@ export async function decrementProductStock(
 ): Promise<void> {
   if (quantity <= 0) return;
   const db = await getDB();
+  await ensureStockSchema(db);
 
   let prevStock = 0;
   let prodName = "Product";

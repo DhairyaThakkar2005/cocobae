@@ -1,7 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import JSZip from "jszip";
-import { getDB } from "../db/schema";
+import { getDB, resetDB, initDatabase } from "../db/schema";
 import { getSetting } from "../db/settings";
 import { logBackup } from "../db/backupLog";
 import { ensureProductImageDir, toRelativeImagePath } from "./imageUtils";
@@ -519,6 +519,12 @@ export async function restoreFullBackup(fileUri: string): Promise<{
     } catch {
       // Ignored
     }
+
+    // Reset database instance connection to force re-open of newly restored file
+    await resetDB();
+
+    // Re-run database migrations so restored backups from older versions get all new columns!
+    await initDatabase();
 
     // 5. Connect and normalize all image paths in the restored database
     const db = await getDB();

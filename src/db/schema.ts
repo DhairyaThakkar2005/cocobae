@@ -2,6 +2,17 @@ import * as SQLite from "expo-sqlite";
 
 let dbInstance: any = null;
 
+export async function resetDB() {
+  if (dbInstance) {
+    try {
+      if (typeof dbInstance.closeAsync === "function") {
+        await dbInstance.closeAsync();
+      }
+    } catch {}
+    dbInstance = null;
+  }
+}
+
 export async function getDB() {
   if (!dbInstance) {
     if (typeof (SQLite as any).openDatabaseAsync === "function") {
@@ -156,7 +167,11 @@ export async function initDatabase() {
   ];
 
   if (typeof db.execAsync === "function") {
-    await db.execAsync(query);
+    try {
+      await db.execAsync(query);
+    } catch (createErr) {
+      console.warn("Table creation warning (proceeding to migrations):", createErr);
+    }
     for (const mq of migrationQueries) {
       try {
         await db.execAsync(mq);
@@ -164,8 +179,24 @@ export async function initDatabase() {
         // Column already exists
       }
     }
+    // Specific check for products.stock_quantity
+    try {
+      if (typeof db.getAllAsync === "function") {
+        const cols: any[] = await db.getAllAsync("PRAGMA table_info(products);");
+        const hasStockCol = cols.some((c: any) => c.name === "stock_quantity");
+        if (!hasStockCol) {
+          await db.execAsync("ALTER TABLE products ADD COLUMN stock_quantity INTEGER DEFAULT 0;");
+        }
+      }
+    } catch (stockPragmaErr) {
+      console.warn("Stock pragma check notice:", stockPragmaErr);
+    }
   } else if (typeof db.exec === "function") {
-    await db.exec([{ sql: query, args: [] }], false);
+    try {
+      await db.exec([{ sql: query, args: [] }], false);
+    } catch (createErr) {
+      console.warn("Table creation warning:", createErr);
+    }
     for (const mq of migrationQueries) {
       try {
         await db.exec([{ sql: mq, args: [] }], false);
