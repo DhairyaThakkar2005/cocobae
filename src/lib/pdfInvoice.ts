@@ -87,6 +87,7 @@ export async function generateInvoicePdf(
           <p style="color: #666; font-size: 11px; margin: 2px 0;">Order Time: ${formattedDate}</p>
           <p style="color: #222; font-size: 12px; margin: 3px 0;">Customer Name: <b>${order.customer_name || "Walk In Customer"}</b></p>
           ${order.customer_phone ? `<p style="color: #222; font-size: 12px; margin: 2px 0;">Mobile: <b>+91 ${order.customer_phone}</b></p>` : ""}
+          <p style="color: #222; font-size: 12px; margin: 2px 0;">Order Type: <b>${order.order_type === "takeaway" ? "TAKEAWAY" : "DINE IN"}</b></p>
         </div>
 
         <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">

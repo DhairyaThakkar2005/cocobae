@@ -43,6 +43,7 @@ export async function initDatabase() {
       image_path TEXT,
       is_veg INTEGER DEFAULT 1,
       is_available INTEGER DEFAULT 1,
+      stock_quantity INTEGER DEFAULT 0,
       sort_order INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
     );
@@ -58,6 +59,7 @@ export async function initDatabase() {
       customer_phone TEXT,
       note TEXT,
       status TEXT DEFAULT 'completed',
+      order_type TEXT DEFAULT 'dine_in',
       discount_type TEXT DEFAULT 'none',
       discount_value REAL DEFAULT 0,
       discount_amount REAL DEFAULT 0,
@@ -123,6 +125,18 @@ export async function initDatabase() {
       trigger_type TEXT,
       status TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS product_stock_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL,
+      product_name TEXT NOT NULL,
+      change_type TEXT NOT NULL,
+      quantity_changed INTEGER NOT NULL,
+      previous_stock INTEGER NOT NULL,
+      new_stock INTEGER NOT NULL,
+      note TEXT,
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
+    );
   `;
 
   const migrationQueries = [
@@ -132,9 +146,11 @@ export async function initDatabase() {
     "ALTER TABLE orders ADD COLUMN discount_amount REAL DEFAULT 0;",
     "ALTER TABLE orders ADD COLUMN delivery_charge REAL DEFAULT 0;",
     "ALTER TABLE orders ADD COLUMN extra_charge_name TEXT DEFAULT 'Delivery Charge';",
+    "ALTER TABLE orders ADD COLUMN order_type TEXT DEFAULT 'dine_in';",
     "ALTER TABLE offers ADD COLUMN product_id INTEGER;",
     "ALTER TABLE offers ADD COLUMN buy_qty INTEGER DEFAULT 1;",
     "ALTER TABLE offers ADD COLUMN get_qty INTEGER DEFAULT 1;",
+    "ALTER TABLE products ADD COLUMN stock_quantity INTEGER DEFAULT 0;",
   ];
 
   if (typeof db.execAsync === "function") {

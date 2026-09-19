@@ -16,6 +16,7 @@ import {
   getProducts,
   addProduct,
   updateProduct,
+  updateProductStock,
   deleteProduct,
   toggleProductAvailability,
   Product,
@@ -24,6 +25,7 @@ import { getCategories, Category } from "../../db/categories";
 import { formatINR } from "../../lib/utils";
 import {
   Plus,
+  Minus,
   Edit3,
   Trash2,
   Search,
@@ -52,6 +54,7 @@ export const ProductsScreen: React.FC = () => {
   const [formName, setFormName] = useState("");
   const [formDesc, setFormDesc] = useState("");
   const [formPrice, setFormPrice] = useState("");
+  const [formStock, setFormStock] = useState("0");
   const [formCategoryId, setFormCategoryId] = useState<number>(1);
   const [formIsVeg, setFormIsVeg] = useState(1);
   const [formImagePath, setFormImagePath] = useState("");
@@ -157,6 +160,7 @@ export const ProductsScreen: React.FC = () => {
     setFormName("");
     setFormDesc("");
     setFormPrice("");
+    setFormStock("0");
     setFormCategoryId(categories[0]?.id || 1);
     setFormIsVeg(1);
     setFormImagePath("");
@@ -168,6 +172,7 @@ export const ProductsScreen: React.FC = () => {
     setFormName(p.name);
     setFormDesc(p.description || "");
     setFormPrice(p.price.toString());
+    setFormStock((p.stock_quantity ?? 0).toString());
     setFormCategoryId(p.category_id);
     setFormIsVeg(p.is_veg);
     setFormImagePath(p.image_path || "");
@@ -186,6 +191,9 @@ export const ProductsScreen: React.FC = () => {
       return;
     }
 
+    const stockNum = parseInt(formStock, 10);
+    const validStock = isNaN(stockNum) || stockNum < 0 ? 0 : stockNum;
+
     try {
       const relativePath = formImagePath.trim()
         ? toRelativeImagePath(formImagePath.trim())
@@ -200,6 +208,7 @@ export const ProductsScreen: React.FC = () => {
           is_veg: formIsVeg,
           is_available: editingProduct.is_available,
           image_path: relativePath,
+          stock_quantity: validStock,
         });
       } else {
         await addProduct({
@@ -210,12 +219,32 @@ export const ProductsScreen: React.FC = () => {
           is_veg: formIsVeg,
           is_available: 1,
           image_path: relativePath,
+          stock_quantity: validStock,
         });
       }
       setModalVisible(false);
       loadData();
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to save product.");
+    }
+  };
+
+  const handleInlineStockChange = async (
+    productId: number,
+    newStock: number,
+  ) => {
+    const safeStock = Math.max(0, newStock);
+    // Optimistically update products list
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === productId ? { ...p, stock_quantity: safeStock } : p,
+      ),
+    );
+    try {
+      await updateProductStock(productId, safeStock, "Quick Stock Adjust");
+    } catch (err: any) {
+      Alert.alert("Error", "Failed to update stock: " + (err.message || "Unknown error"));
+      loadData();
     }
   };
 
@@ -377,16 +406,121 @@ export const ProductsScreen: React.FC = () => {
                 {p.category_name} • {p.description || "No description"}
               </Text>
 
-              <Text
+              <View
                 style={{
-                  color: THEME.colors.primary,
-                  fontSize: 14,
-                  fontWeight: "800",
-                  marginTop: 4,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginTop: 6,
                 }}
               >
-                {formatINR(p.price)}
-              </Text>
+                <Text
+                  style={{
+                    color: THEME.colors.primary,
+                    fontSize: 14,
+                    fontWeight: "800",
+                  }}
+                >
+                  {formatINR(p.price)}
+                </Text>
+
+                {/* Direct Stock Stepper / Input */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    backgroundColor: THEME.colors.surface2,
+                    borderRadius: THEME.radius.md,
+                    paddingHorizontal: 4,
+                    paddingVertical: 2,
+                    gap: 4,
+                    borderWidth: 1,
+                    borderColor:
+                      (p.stock_quantity ?? 0) <= 0
+                        ? THEME.colors.danger
+                        : (p.stock_quantity ?? 0) < 5
+                          ? "#F59E0B"
+                          : THEME.colors.border,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 9,
+                      fontWeight: "700",
+                      color: THEME.colors.textMuted,
+                      marginLeft: 2,
+                    }}
+                  >
+                    STOCK:
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() =>
+                      handleInlineStockChange(
+                        p.id,
+                        (p.stock_quantity ?? 0) - 1,
+                      )
+                    }
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 4,
+                      backgroundColor: THEME.colors.surface,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      borderWidth: 1,
+                      borderColor: THEME.colors.border,
+                    }}
+                  >
+                    <Minus size={11} color={THEME.colors.text} />
+                  </TouchableOpacity>
+
+                  <TextInput
+                    key={`stock-${p.id}-${p.stock_quantity}`}
+                    defaultValue={String(p.stock_quantity ?? 0)}
+                    keyboardType="numeric"
+                    onEndEditing={(e) => {
+                      const val = parseInt(e.nativeEvent.text, 10);
+                      handleInlineStockChange(
+                        p.id,
+                        isNaN(val) || val < 0 ? 0 : val,
+                      );
+                    }}
+                    style={{
+                      color:
+                        (p.stock_quantity ?? 0) <= 0
+                          ? THEME.colors.danger
+                          : THEME.colors.text,
+                      fontSize: 12,
+                      fontWeight: "800",
+                      minWidth: 28,
+                      textAlign: "center",
+                      paddingVertical: 0,
+                      paddingHorizontal: 2,
+                    }}
+                  />
+
+                  <TouchableOpacity
+                    onPress={() =>
+                      handleInlineStockChange(
+                        p.id,
+                        (p.stock_quantity ?? 0) + 1,
+                      )
+                    }
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 4,
+                      backgroundColor: THEME.colors.primary,
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Plus size={11} color={THEME.colors.textInverse} />
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
 
             {/* Quick Actions (Toggle in stock, Edit, Delete) */}
@@ -468,6 +602,14 @@ export const ProductsScreen: React.FC = () => {
           value={formPrice}
           onChangeText={setFormPrice}
           placeholder="250"
+          keyboardType="numeric"
+        />
+
+        <Input
+          label="Stock Quantity (Available Units)"
+          value={formStock}
+          onChangeText={setFormStock}
+          placeholder="0"
           keyboardType="numeric"
         />
 

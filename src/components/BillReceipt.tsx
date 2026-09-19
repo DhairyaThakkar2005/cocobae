@@ -166,6 +166,10 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
                   <span>Cust: ${order.customer_name || "Walk-In"}</span>
                   ${order.customer_phone ? `<span>Ph: ${order.customer_phone}</span>` : `<span>Pay: ${(order.payment_method || "UPI").toUpperCase()}</span>`}
                 </div>
+                <div style="display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 700; margin-top: 2px;">
+                  <span>Type: ${(order.order_type || "dine_in").replace('_', ' ').toUpperCase()}</span>
+                  ${order.customer_phone ? `<span>Pay: ${(order.payment_method || "UPI").toUpperCase()}</span>` : `<span></span>`}
+                </div>
               </div>
 
               <div class="divider"></div>
@@ -524,6 +528,23 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
               }}
             >
               {order.payment_method} (PAID)
+            </Text>
+          </View>
+          <View
+            style={{ flexDirection: "row", justifyContent: "space-between" }}
+          >
+            <Text style={{ color: THEME.colors.textMuted, fontSize: 12 }}>
+              Order Type:
+            </Text>
+            <Text
+              style={{
+                color: THEME.colors.text,
+                fontSize: 12,
+                fontWeight: "700",
+                textTransform: "uppercase",
+              }}
+            >
+              {order.order_type === "takeaway" ? "Takeaway 🛍️" : "Dine In 🍽️"}
             </Text>
           </View>
         </View>

@@ -2,6 +2,7 @@ export {
   Cake,
   IceCream,
   Coffee,
+  Utensils,
   ShoppingBag,
   ShoppingCart,
   Plus,

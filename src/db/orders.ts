@@ -21,6 +21,7 @@ export interface Order {
   customer_phone?: string;
   note?: string;
   status: string;
+  order_type?: "dine_in" | "takeaway";
   discount_type?:
     | "none"
     | "percentage"
@@ -46,8 +47,8 @@ export async function createOrder(
   const orderDate = new Date().toISOString();
 
   const insertOrderSql = `
-    INSERT INTO orders (order_number, order_date, total_amount, gst_amount, payment_method, customer_name, customer_phone, note, status, discount_type, discount_value, discount_amount, delivery_charge, extra_charge_name)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO orders (order_number, order_date, total_amount, gst_amount, payment_method, customer_name, customer_phone, note, status, order_type, discount_type, discount_value, discount_amount, delivery_charge, extra_charge_name)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   const orderParams = [
     orderNumber,
@@ -59,6 +60,7 @@ export async function createOrder(
     order.customer_phone || "",
     order.note || "",
     "completed",
+    order.order_type || "dine_in",
     order.discount_type || "none",
     order.discount_value || 0,
     order.discount_amount || 0,
@@ -126,6 +128,7 @@ export async function createOrder(
     customer_phone: order.customer_phone,
     note: order.note,
     status: "completed",
+    order_type: order.order_type || "dine_in",
     discount_type: order.discount_type || "none",
     discount_value: order.discount_value || 0,
     discount_amount: order.discount_amount || 0,
@@ -253,6 +256,10 @@ export async function updateOrder(
   if (orderData.status !== undefined) {
     fields.push("status = ?");
     params.push(orderData.status);
+  }
+  if (orderData.order_type !== undefined) {
+    fields.push("order_type = ?");
+    params.push(orderData.order_type);
   }
   if (orderData.discount_type !== undefined) {
     fields.push("discount_type = ?");

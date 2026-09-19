@@ -22,11 +22,13 @@ interface CartStore {
   selectedOffer: Offer | null;
   deliveryCharge: number;
   extraChargeName: string;
+  orderType: "dine_in" | "takeaway";
 
   setSettings: (gstEnabled: boolean, gstPercent: number) => void;
   setCustomerName: (name: string) => void;
   setCustomerPhone: (phone: string) => void;
   setOrderNote: (note: string) => void;
+  setOrderType: (orderType: "dine_in" | "takeaway") => void;
   setDiscount: (type: "none" | "percentage" | "flat", value: number) => void;
   setOffer: (offer: Offer | null) => void;
   clearDiscount: () => void;
@@ -60,11 +62,13 @@ export const useCartStore = create<CartStore>((set, get) => ({
   selectedOffer: null,
   deliveryCharge: 0,
   extraChargeName: "",
+  orderType: "dine_in",
 
   setSettings: (gstEnabled, gstPercent) => set({ gstEnabled, gstPercent }),
   setCustomerName: (customerName) => set({ customerName }),
   setCustomerPhone: (customerPhone) => set({ customerPhone }),
   setOrderNote: (orderNote) => set({ orderNote }),
+  setOrderType: (orderType) => set({ orderType }),
   setDiscount: (discountType, discountValue) =>
     set({ discountType, discountValue, selectedOffer: null }),
   setOffer: (offer) => {
@@ -177,6 +181,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
       selectedOffer: null,
       deliveryCharge: 0,
       extraChargeName: "",
+      orderType: "dine_in",
     });
   },
 

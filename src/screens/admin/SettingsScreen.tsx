@@ -66,12 +66,6 @@ import {
 } from "../../db/offers";
 import { getCategories, Category } from "../../db/categories";
 import { getProducts, Product } from "../../db/products";
-import {
-  getInventoryItems,
-  updateStock,
-  createInventoryItem,
-  InventoryItem,
-} from "../../db/inventory";
 import { getAllCustomers, Customer } from "../../db/customers";
 import { formatINR } from "../../lib/utils";
 
@@ -121,14 +115,6 @@ export const SettingsScreen: React.FC = () => {
   const [newOfferVal, setNewOfferVal] = useState("50");
   const [newOfferMinOrder, setNewOfferMinOrder] = useState("0");
 
-  // Raw Material Inventory State
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [showAddInv, setShowAddInv] = useState(false);
-  const [newInvName, setNewInvName] = useState("");
-  const [newInvUnit, setNewInvUnit] = useState("kg");
-  const [newInvStock, setNewInvStock] = useState("10");
-  const [newInvMin, setNewInvMin] = useState("2");
-
   // Customer CRM State
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [crmSearch, setCrmSearch] = useState("");
@@ -139,14 +125,13 @@ export const SettingsScreen: React.FC = () => {
 
   const loadSettingsAndBackups = async () => {
     try {
-      const [settings, files, logs, offerList, catList, invList, custList, prodList] =
+      const [settings, files, logs, offerList, catList, custList, prodList] =
         await Promise.all([
           getAllSettings(),
           getBackupFiles(),
           getBackupLogs(10),
           getOffers(),
           getCategories(),
-          getInventoryItems(),
           getAllCustomers(),
           getProducts(),
         ]);
@@ -154,7 +139,6 @@ export const SettingsScreen: React.FC = () => {
       setProductsList(prodList || []);
       setOffers(offerList || []);
       setCategories(catList || []);
-      setInventory(invList || []);
       setCustomers(custList || []);
 
       if (settings.cafe_name) setCafeName(settings.cafe_name);
@@ -176,7 +160,6 @@ export const SettingsScreen: React.FC = () => {
 
       setOffers(offerList);
       setCategories(catList);
-      setInventory(invList);
       setCustomers(custList);
       setBackupFiles(files);
       setBackupLogs(logs);
@@ -281,44 +264,6 @@ export const SettingsScreen: React.FC = () => {
       Alert.alert("Offer Created", `"${created.title}" is now active!`);
     } catch (e: any) {
       Alert.alert("Creation Error", e.message || "Could not create offer.");
-    }
-  };
-
-  const handleUpdateStock = async (id: number, delta: number) => {
-    try {
-      await updateStock(id, delta);
-      setInventory((prev) =>
-        prev.map((it) =>
-          it.id === id
-            ? { ...it, current_stock: Math.max(0, it.current_stock + delta) }
-            : it,
-        ),
-      );
-    } catch (e: any) {
-      Alert.alert("Inventory Error", e.message || "Could not update stock.");
-    }
-  };
-
-  const handleCreateInventoryItem = async () => {
-    if (!newInvName.trim()) {
-      Alert.alert("Validation", "Please enter item name.");
-      return;
-    }
-    try {
-      const created = await createInventoryItem({
-        name: newInvName.trim(),
-        unit: newInvUnit.trim() || "kg",
-        current_stock: parseFloat(newInvStock) || 0,
-        min_alert_stock: parseFloat(newInvMin) || 2,
-        cost_per_unit: 0,
-      });
-      setInventory((prev) => [created, ...prev]);
-      setShowAddInv(false);
-      setNewInvName("");
-      setNewInvStock("10");
-      Alert.alert("Stock Item Added", `${created.name} is now tracked.`);
-    } catch (e: any) {
-      Alert.alert("Error", e.message || "Could not add inventory item.");
     }
   };
 
@@ -1250,206 +1195,7 @@ export const SettingsScreen: React.FC = () => {
         })}
       </View>
 
-      {/* 5. Raw Material Inventory Tracking Section */}
-      <View
-        style={{
-          backgroundColor: THEME.colors.surface,
-          borderRadius: THEME.radius.lg,
-          borderWidth: 1,
-          borderColor: THEME.colors.border,
-          padding: 16,
-          marginBottom: 16,
-        }}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 8,
-            gap: 8,
-          }}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
-            <Layers size={16} color={THEME.colors.primary} />
-            <Text
-              numberOfLines={1}
-              style={{
-                color: THEME.colors.primary,
-                fontSize: 13,
-                fontWeight: "700",
-                flexShrink: 1,
-              }}
-            >
-              RAW INVENTORY ({inventory.length})
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => setShowAddInv(!showAddInv)}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 4,
-              backgroundColor: THEME.colors.primaryGlow,
-              paddingVertical: 5,
-              paddingHorizontal: 10,
-              borderRadius: THEME.radius.md,
-              borderWidth: 1,
-              borderColor: THEME.colors.primary,
-              flexShrink: 0,
-            }}
-          >
-            <Plus size={14} color={THEME.colors.primary} />
-            <Text style={{ color: THEME.colors.primary, fontSize: 12, fontWeight: "700" }}>
-              {showAddInv ? "Close" : "Add Item"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text
-          style={{
-            color: THEME.colors.textMuted,
-            fontSize: 12,
-            marginBottom: 12,
-          }}
-        >
-          Track café kitchen raw materials (Milk, Coffee beans, Coco powder, Cups). Quick +/- stock adjustments.
-        </Text>
-
-        {showAddInv ? (
-          <View
-            style={{
-              backgroundColor: THEME.colors.surface2,
-              borderRadius: THEME.radius.md,
-              borderWidth: 1,
-              borderColor: THEME.colors.borderStrong,
-              padding: 14,
-              marginBottom: 14,
-            }}
-          >
-            <Input
-              label="Ingredient / Item Name"
-              value={newInvName}
-              onChangeText={setNewInvName}
-              placeholder="e.g. Milk / Sugar / Paper Cups"
-            />
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <Input
-                  label="Unit (kg, L, units)"
-                  value={newInvUnit}
-                  onChangeText={setNewInvUnit}
-                  placeholder="kg"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Input
-                  label="Current Stock"
-                  value={newInvStock}
-                  onChangeText={setNewInvStock}
-                  keyboardType="numeric"
-                  placeholder="10"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Input
-                  label="Alert Threshold"
-                  value={newInvMin}
-                  onChangeText={setNewInvMin}
-                  keyboardType="numeric"
-                  placeholder="2"
-                />
-              </View>
-            </View>
-            <Button onPress={handleCreateInventoryItem} variant="primary" size="sm">
-              Save Ingredient
-            </Button>
-          </View>
-        ) : null}
-
-        {inventory.map((it) => {
-          const isLow = it.current_stock <= it.min_alert_stock;
-          return (
-            <View
-              key={it.id}
-              style={{
-                backgroundColor: THEME.colors.surface2,
-                borderRadius: THEME.radius.md,
-                borderWidth: 1,
-                borderColor: isLow ? "#EF444440" : THEME.colors.border,
-                padding: 10,
-                marginBottom: 6,
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={{ color: THEME.colors.text, fontSize: 13, fontWeight: "700" }}>
-                    {it.name}
-                  </Text>
-                  {isLow ? (
-                    <View
-                      style={{
-                        backgroundColor: "#EF444420",
-                        paddingHorizontal: 6,
-                        paddingVertical: 1,
-                        borderRadius: 4,
-                      }}
-                    >
-                      <Text style={{ color: "#EF4444", fontSize: 10, fontWeight: "800" }}>
-                        LOW STOCK
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Text style={{ color: THEME.colors.textMuted, fontSize: 11, marginTop: 2 }}>
-                  Stock: {it.current_stock} {it.unit} (Min alert: {it.min_alert_stock} {it.unit})
-                </Text>
-              </View>
-
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <TouchableOpacity
-                  onPress={() => handleUpdateStock(it.id, -1)}
-                  style={{
-                    backgroundColor: THEME.colors.surface,
-                    borderWidth: 1,
-                    borderColor: THEME.colors.border,
-                    width: 30,
-                    height: 30,
-                    borderRadius: 6,
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
-                >
-                  <Minus size={14} color={THEME.colors.text} />
-                </TouchableOpacity>
-                <Text style={{ color: THEME.colors.text, fontWeight: "800", minWidth: 26, textAlign: "center" }}>
-                  {it.current_stock}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => handleUpdateStock(it.id, 1)}
-                  style={{
-                    backgroundColor: THEME.colors.surface,
-                    borderWidth: 1,
-                    borderColor: THEME.colors.border,
-                    width: 30,
-                    height: 30,
-                    borderRadius: 6,
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
-                >
-                  <Plus size={14} color={THEME.colors.text} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        })}
-      </View>
-
-      {/* 6. Customer CRM & Repeat Loyalty Section */}
+      {/* 5. Customer CRM & Repeat Loyalty Section */}
       <View
         style={{
           backgroundColor: THEME.colors.surface,

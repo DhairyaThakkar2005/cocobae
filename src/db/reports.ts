@@ -61,6 +61,30 @@ export interface PaymentReportItem {
   avgTicket: number;
 }
 
+export interface StockReportItem {
+  productId: number;
+  productName: string;
+  categoryName: string;
+  openingStock: number;
+  soldQuantity: number;
+  restockedQuantity: number;
+  closingStock: number;
+  currentStock: number;
+  isVeg: boolean;
+}
+
+export interface StockLogItem {
+  id: number;
+  productId: number;
+  productName: string;
+  changeType: string;
+  quantityChanged: number;
+  previousStock: number;
+  newStock: number;
+  note?: string;
+  createdAt: string;
+}
+
 export function getDateRangeBounds(
   preset: DatePreset,
   customStart?: string,
@@ -408,4 +432,159 @@ export async function getPaymentReport(
     totalCollected,
     totalTransactions,
   };
+}
+
+// 6. Report 6: Stock Overview & Balance (Opening, Sold, Closing)
+export async function getStockReport(range: DateRange): Promise<{
+  items: StockReportItem[];
+  totalOpening: number;
+  totalSold: number;
+  totalRestocked: number;
+  totalClosing: number;
+}> {
+  const { startBound, endBound } = getQueryDateBounds(range);
+
+  // 1. Fetch all products
+  const products = await queryAll(`
+    SELECT p.id, p.name, p.stock_quantity, p.is_veg, c.name as category_name
+    FROM products p
+    LEFT JOIN categories c ON c.id = p.category_id
+    ORDER BY c.sort_order ASC, p.name ASC
+  `);
+
+  // 2. Units sold inside the range per product
+  const soldInRangeRows = await queryAll(
+    `SELECT oi.product_id, SUM(oi.quantity) as sold_qty
+     FROM order_items oi
+     JOIN orders o ON o.id = oi.order_id
+     WHERE o.order_date >= ? AND o.order_date <= ?
+     GROUP BY oi.product_id`,
+    [startBound, endBound],
+  );
+  const soldInRangeMap = new Map<number, number>();
+  soldInRangeRows.forEach((r: any) => {
+    soldInRangeMap.set(r.product_id, r.sold_qty || 0);
+  });
+
+  // 3. Units sold after the range endBound (to calculate closing stock at endBound)
+  const soldAfterRows = await queryAll(
+    `SELECT oi.product_id, SUM(oi.quantity) as sold_qty
+     FROM order_items oi
+     JOIN orders o ON o.id = oi.order_id
+     WHERE o.order_date > ?
+     GROUP BY oi.product_id`,
+    [endBound],
+  );
+  const soldAfterMap = new Map<number, number>();
+  soldAfterRows.forEach((r: any) => {
+    soldAfterMap.set(r.product_id, r.sold_qty || 0);
+  });
+
+  // 4. Restocks inside range
+  const restockInRangeRows = await queryAll(
+    `SELECT product_id, SUM(quantity_changed) as restock_qty
+     FROM product_stock_logs
+     WHERE change_type = 'restock' AND created_at >= ? AND created_at <= ?
+     GROUP BY product_id`,
+    [startBound, endBound],
+  );
+  const restockInRangeMap = new Map<number, number>();
+  restockInRangeRows.forEach((r: any) => {
+    restockInRangeMap.set(r.product_id, r.restock_qty || 0);
+  });
+
+  // 5. Restocks after endBound
+  const restockAfterRows = await queryAll(
+    `SELECT product_id, SUM(quantity_changed) as restock_qty
+     FROM product_stock_logs
+     WHERE change_type = 'restock' AND created_at > ?
+     GROUP BY product_id`,
+    [endBound],
+  );
+  const restockAfterMap = new Map<number, number>();
+  restockAfterRows.forEach((r: any) => {
+    restockAfterMap.set(r.product_id, r.restock_qty || 0);
+  });
+
+  let totalOpening = 0;
+  let totalSold = 0;
+  let totalRestocked = 0;
+  let totalClosing = 0;
+
+  const items: StockReportItem[] = products.map((p: any) => {
+    const currentStock = p.stock_quantity ?? 0;
+    const soldAfter = soldAfterMap.get(p.id) || 0;
+    const restockAfter = restockAfterMap.get(p.id) || 0;
+    const soldInRange = soldInRangeMap.get(p.id) || 0;
+    const restockInRange = restockInRangeMap.get(p.id) || 0;
+
+    // Closing stock at end of range
+    const closingStock = Math.max(0, currentStock + soldAfter - restockAfter);
+    // Opening stock at start of range
+    const openingStock = Math.max(0, closingStock + soldInRange - restockInRange);
+
+    totalOpening += openingStock;
+    totalSold += soldInRange;
+    totalRestocked += restockInRange;
+    totalClosing += closingStock;
+
+    return {
+      productId: p.id,
+      productName: p.name,
+      categoryName: p.category_name || "Dessert",
+      openingStock,
+      soldQuantity: soldInRange,
+      restockedQuantity: restockInRange,
+      closingStock,
+      currentStock,
+      isVeg: p.is_veg === 1,
+    };
+  });
+
+  return {
+    items,
+    totalOpening,
+    totalSold,
+    totalRestocked,
+    totalClosing,
+  };
+}
+
+// 7. Report 7: Stock Arrival & Restock History Logs
+export async function getStockArrivalLogs(range?: DateRange): Promise<StockLogItem[]> {
+  let sql = `
+    SELECT 
+      id,
+      product_id,
+      product_name,
+      change_type,
+      quantity_changed,
+      previous_stock,
+      new_stock,
+      note,
+      created_at
+    FROM product_stock_logs
+  `;
+  const params: any[] = [];
+
+  if (range) {
+    const { startBound, endBound } = getQueryDateBounds(range);
+    sql += ` WHERE created_at >= ? AND created_at <= ?`;
+    params.push(startBound, endBound);
+  }
+
+  sql += ` ORDER BY created_at DESC, id DESC LIMIT 200`;
+
+  const rows = await queryAll(sql, params);
+  return rows.map((r: any) => ({
+    id: r.id,
+    productId: r.product_id,
+    productName: r.product_name,
+    changeType: r.change_type,
+    quantityChanged: r.quantity_changed,
+    previousStock: r.previous_stock,
+    newStock: r.new_stock,
+    note: r.note,
+    createdAt: r.created_at,
+  }));
 }

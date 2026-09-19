@@ -23,6 +23,7 @@ import {
   Smartphone,
   CreditCard,
   BarChart3,
+  Truck,
 } from "../../lib/icons";
 import { useBreakpoint } from "../../theme/breakpoints";
 import { formatINR } from "../../lib/utils";
@@ -49,6 +50,7 @@ import { ProductSalesDetail } from "../../components/reports/ProductSalesDetail"
 import { CustomerSalesDetail } from "../../components/reports/CustomerSalesDetail";
 import { CategorySalesDetail } from "../../components/reports/CategorySalesDetail";
 import { PaymentReportDetail } from "../../components/reports/PaymentReportDetail";
+import { StockReportDetail } from "../../components/reports/StockReportDetail";
 
 export type ActiveReportType =
   | "sales-by-date"
@@ -56,6 +58,7 @@ export type ActiveReportType =
   | "customer-sales"
   | "category-sales"
   | "payment-report"
+  | "stock-report"
   | null;
 
 export const SalesScreen: React.FC = () => {
@@ -170,6 +173,16 @@ export const SalesScreen: React.FC = () => {
   if (activeReport === "payment-report") {
     return (
       <PaymentReportDetail
+        range={range}
+        onRangeChange={setRange}
+        onBack={() => setActiveReport(null)}
+      />
+    );
+  }
+
+  if (activeReport === "stock-report") {
+    return (
+      <StockReportDetail
         range={range}
         onRangeChange={setRange}
         onBack={() => setActiveReport(null)}
@@ -1000,6 +1013,118 @@ export const SalesScreen: React.FC = () => {
                     </Text>
                   </View>
                 ))}
+              </View>
+            </TouchableOpacity>
+
+            {/* 6. Stock & Inventory Report Card */}
+            <TouchableOpacity
+              onPress={() => setActiveReport("stock-report")}
+              activeOpacity={0.8}
+              style={{
+                backgroundColor: THEME.colors.surface,
+                borderRadius: THEME.radius.lg,
+                borderWidth: 1,
+                borderColor: THEME.colors.border,
+                padding: 16,
+                gap: 12,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                    flex: 1,
+                    marginRight: 8,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 14,
+                      backgroundColor: "rgba(16, 185, 129, 0.18)",
+                      borderWidth: 1,
+                      borderColor: THEME.colors.success,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Truck size={22} color={THEME.colors.success} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        color: THEME.colors.text,
+                        fontSize: 16,
+                        fontWeight: "800",
+                      }}
+                    >
+                      Stock & Restock Reports
+                    </Text>
+                    <Text
+                      numberOfLines={2}
+                      style={{
+                        color: THEME.colors.textMuted,
+                        fontSize: 12,
+                        fontWeight: "500",
+                        marginTop: 2,
+                      }}
+                    >
+                      Opening stock, units sold, closing balance & arrival logs
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ flexShrink: 0 }}>
+                  <ChevronRight size={18} color={THEME.colors.primary} />
+                </View>
+              </View>
+
+              {/* Quick Snapshot */}
+              <View
+                style={{
+                  backgroundColor: THEME.colors.surface2,
+                  borderRadius: THEME.radius.md,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 12 }}>
+                  Period Units Sold:{" "}
+                  <Text style={{ color: THEME.colors.text, fontWeight: "700" }}>
+                    {summary.totalItemsSold} units
+                  </Text>
+                </Text>
+                <View
+                  style={{
+                    backgroundColor: "rgba(16, 185, 129, 0.15)",
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: 4,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: THEME.colors.success,
+                      fontSize: 11,
+                      fontWeight: "800",
+                    }}
+                  >
+                    VIEW STOCK AUDIT ➔
+                  </Text>
+                </View>
               </View>
             </TouchableOpacity>
           </View>

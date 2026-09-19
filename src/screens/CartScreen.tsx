@@ -16,11 +16,13 @@ import {
   Minus,
   ShoppingBag,
   Sparkles,
+  Utensils,
 } from "../lib/icons";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
 import { useBreakpoint } from "../theme/breakpoints";
 import Animated, { FadeInDown, Layout } from "react-native-reanimated";
+import { getAllSettings } from "../db/settings";
 
 export interface CartScreenProps {
   onBack: () => void;
@@ -50,7 +52,11 @@ export const CartScreen: React.FC<CartScreenProps> = ({
     discountValue,
     selectedOffer,
     deliveryCharge,
+    setDeliveryCharge,
     extraChargeName,
+    setExtraChargeName,
+    orderType,
+    setOrderType,
   } = useCartStore();
 
   const totalItems = getTotalItemsCount();
@@ -58,6 +64,23 @@ export const CartScreen: React.FC<CartScreenProps> = ({
   const discountAmount = getDiscountAmount();
   const gstAmount = getGstAmount();
   const grandTotal = getGrandTotal();
+
+  const handleSelectOrderType = async (type: "dine_in" | "takeaway") => {
+    setOrderType(type);
+    if (type === "takeaway") {
+      try {
+        const s = await getAllSettings();
+        if (s.delivery_enabled === "1" && s.delivery_charge) {
+          const defaultCharge = parseFloat(s.delivery_charge) || 0;
+          setDeliveryCharge(defaultCharge);
+          setExtraChargeName(s.extra_charge_name || "Packaging / Delivery");
+        }
+      } catch {}
+    } else {
+      setDeliveryCharge(0);
+      setExtraChargeName("");
+    }
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: THEME.colors.bg }}>
@@ -156,6 +179,98 @@ export const CartScreen: React.FC<CartScreenProps> = ({
             style={{ flex: 1, maxWidth: isTablet ? 600 : "100%" }}
             contentContainerStyle={{ padding: 16 }}
           >
+            {/* Order Type Toggle: Dine In vs Takeaway */}
+            <View
+              style={{
+                flexDirection: "row",
+                backgroundColor: THEME.colors.surface,
+                borderRadius: THEME.radius.lg,
+                borderWidth: 1,
+                borderColor: THEME.colors.border,
+                padding: 4,
+                marginBottom: 14,
+                gap: 6,
+              }}
+            >
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => handleSelectOrderType("dine_in")}
+                style={{
+                  flex: 1,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingVertical: 10,
+                  borderRadius: THEME.radius.md,
+                  backgroundColor:
+                    orderType === "dine_in"
+                      ? THEME.colors.primary
+                      : "transparent",
+                  gap: 8,
+                }}
+              >
+                <Utensils
+                  size={16}
+                  color={
+                    orderType === "dine_in"
+                      ? THEME.colors.textInverse
+                      : THEME.colors.textMuted
+                  }
+                />
+                <Text
+                  style={{
+                    color:
+                      orderType === "dine_in"
+                        ? THEME.colors.textInverse
+                        : THEME.colors.text,
+                    fontSize: 14,
+                    fontWeight: "800",
+                  }}
+                >
+                  Dine In
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => handleSelectOrderType("takeaway")}
+                style={{
+                  flex: 1,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingVertical: 10,
+                  borderRadius: THEME.radius.md,
+                  backgroundColor:
+                    orderType === "takeaway"
+                      ? THEME.colors.primary
+                      : "transparent",
+                  gap: 8,
+                }}
+              >
+                <ShoppingBag
+                  size={16}
+                  color={
+                    orderType === "takeaway"
+                      ? THEME.colors.textInverse
+                      : THEME.colors.textMuted
+                  }
+                />
+                <Text
+                  style={{
+                    color:
+                      orderType === "takeaway"
+                        ? THEME.colors.textInverse
+                        : THEME.colors.text,
+                    fontSize: 14,
+                    fontWeight: "800",
+                  }}
+                >
+                  Takeaway
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             <Text
               style={{
                 color: THEME.colors.textMuted,

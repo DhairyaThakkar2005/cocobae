@@ -17,6 +17,7 @@ import { getAllSettings } from "../db/settings";
 import { Offer, getActiveOffers, findBestOfferForCart, isItemEligibleForOffer } from "../db/offers";
 import { Customer, getCustomerByPhone, recordCustomerVisit } from "../db/customers";
 import { deductInventoryForOrder } from "../db/inventory";
+import { decrementProductStock } from "../db/products";
 import { generateInvoicePdf, shareInvoicePdf } from "../lib/pdfInvoice";
 import { formatINR } from "../lib/utils";
 import {
@@ -35,6 +36,8 @@ import {
   X,
   Award,
   Truck,
+  Utensils,
+  ShoppingBag,
 } from "../lib/icons";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
@@ -72,6 +75,8 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     setDeliveryCharge,
     extraChargeName,
     setExtraChargeName,
+    orderType,
+    setOrderType,
     clearCart,
   } = useCartStore();
 
@@ -168,7 +173,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         storeCity: s.store_city || "Vadodara",
         upiId: s.upi_id || "7043338863m@pnb",
       });
-      if (s.delivery_enabled === "1" && s.delivery_charge && deliveryCharge === 0) {
+      if (s.delivery_enabled === "1" && s.delivery_charge && deliveryCharge === 0 && orderType === "takeaway") {
         const defaultCharge = parseFloat(s.delivery_charge) || 0;
         setDeliveryCharge(defaultCharge);
         setDeliveryInput(defaultCharge > 0 ? defaultCharge.toString() : "");
@@ -208,6 +213,28 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     }
   };
 
+  const handleToggleOrderType = async (type: "dine_in" | "takeaway") => {
+    setOrderType(type);
+    if (type === "takeaway") {
+      try {
+        const s = await getAllSettings();
+        if (s.delivery_enabled === "1" && s.delivery_charge) {
+          const defaultCharge = parseFloat(s.delivery_charge) || 0;
+          setDeliveryCharge(defaultCharge);
+          setDeliveryInput(defaultCharge > 0 ? defaultCharge.toString() : "");
+          const name = s.extra_charge_name || "Packaging / Delivery";
+          setChargeNameInput(name);
+          setExtraChargeName(name);
+        }
+      } catch {}
+    } else {
+      setDeliveryCharge(0);
+      setDeliveryInput("");
+      setChargeNameInput("");
+      setExtraChargeName("");
+    }
+  };
+
   const handlePlaceOrder = async () => {
     if (items.length === 0) {
       Alert.alert("Empty Order", "Please add items before placing order.");
@@ -226,6 +253,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         customer_phone: customerPhone.trim() || undefined,
         note: orderNote.trim(),
         status: "completed",
+        order_type: orderType,
         discount_type: selectedOffer ? ("offer" as const) : discountType,
         discount_value: selectedOffer ? selectedOffer.discount_value : discountValue,
         discount_amount: discountAmount,
@@ -245,6 +273,11 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
 
       // Deduct raw material ingredients from kitchen inventory
       deductInventoryForOrder(itemsPayload).catch(() => {});
+
+      // Deduct finished product stock
+      for (const it of itemsPayload) {
+        decrementProductStock(it.product_id, it.quantity).catch(() => {});
+      }
 
       // Record CRM customer visit
       if (customerPhone.trim().length >= 10) {
@@ -398,6 +431,37 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
               >
                 #{successOrder.order_number || String(successOrder.id).padStart(4, "0")}
               </Text>
+            </View>
+
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                Order Type
+              </Text>
+              <View
+                style={{
+                  backgroundColor: THEME.colors.primary + "20",
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 6,
+                }}
+              >
+                <Text
+                  style={{
+                    color: THEME.colors.primary,
+                    fontSize: 12,
+                    fontWeight: "800",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {successOrder.order_type === "takeaway" ? "Takeaway 🛍️" : "Dine In 🍽️"}
+                </Text>
+              </View>
             </View>
 
             <View
@@ -710,6 +774,97 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
             gap: 16,
           }}
         >
+          {/* Order Type: Dine In vs Takeaway Selector */}
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: THEME.colors.surface,
+              borderRadius: THEME.radius.lg,
+              borderWidth: 1,
+              borderColor: THEME.colors.border,
+              padding: 4,
+              gap: 6,
+            }}
+          >
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => handleToggleOrderType("dine_in")}
+              style={{
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: 10,
+                borderRadius: THEME.radius.md,
+                backgroundColor:
+                  orderType === "dine_in"
+                    ? THEME.colors.primary
+                    : "transparent",
+                gap: 8,
+              }}
+            >
+              <Utensils
+                size={16}
+                color={
+                  orderType === "dine_in"
+                    ? THEME.colors.textInverse
+                    : THEME.colors.textMuted
+                }
+              />
+              <Text
+                style={{
+                  color:
+                    orderType === "dine_in"
+                      ? THEME.colors.textInverse
+                      : THEME.colors.text,
+                  fontSize: 14,
+                  fontWeight: "800",
+                }}
+              >
+                Dine In
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => handleToggleOrderType("takeaway")}
+              style={{
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: 10,
+                borderRadius: THEME.radius.md,
+                backgroundColor:
+                  orderType === "takeaway"
+                    ? THEME.colors.primary
+                    : "transparent",
+                gap: 8,
+              }}
+            >
+              <ShoppingBag
+                size={16}
+                color={
+                  orderType === "takeaway"
+                    ? THEME.colors.textInverse
+                    : THEME.colors.textMuted
+                }
+              />
+              <Text
+                style={{
+                  color:
+                    orderType === "takeaway"
+                      ? THEME.colors.textInverse
+                      : THEME.colors.text,
+                  fontSize: 14,
+                  fontWeight: "800",
+                }}
+              >
+                Takeaway
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Customer Name Field */}
           <View
             style={{
