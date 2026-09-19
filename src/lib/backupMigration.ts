@@ -1,6 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import JSZip from "jszip";
+import * as SQLite from "expo-sqlite";
 import { getDB, resetDB, initDatabase } from "../db/schema";
 import { getSetting } from "../db/settings";
 import { logBackup } from "../db/backupLog";
@@ -416,11 +417,17 @@ async function rollbackFromSafetyBackup(): Promise<void> {
 /**
  * Transactional, rollback-safe restore of database and product images from a ZIP or DB.
  */
-export async function restoreFullBackup(fileUri: string): Promise<{
+export async function restoreFullBackup(
+  fileUri: string,
+  mode: "merge" | "overwrite" = "merge",
+): Promise<{
   success: boolean;
   restoredProducts: number;
   restoredImages: number;
   restoredOrders: number;
+  mergedOrdersCount?: number;
+  preservedOrdersCount?: number;
+  mode: "merge" | "overwrite";
   error?: string;
 }> {
   // 1. Pre-restore validation
@@ -498,38 +505,210 @@ export async function restoreFullBackup(fileUri: string): Promise<{
       }
     }
 
-    // 4. Overwrite live SQLite database
     const stagedDb = `${stagingDir}${DB_FILE_NAME}`;
     const sInfo = await FileSystem.getInfoAsync(stagedDb);
     if (!sInfo.exists || sInfo.size === 0) {
       throw new Error("Staged database snapshot is missing or corrupted.");
     }
 
-    const dInfo = await FileSystem.getInfoAsync(dbDir);
-    if (!dInfo.exists) {
-      await FileSystem.makeDirectoryAsync(dbDir, { intermediates: true });
+    let mergedOrdersCount = 0;
+    let preservedOrdersCount = 0;
+
+    if (mode === "merge") {
+      // --- SMART MERGE MODE: PRESERVE ALL CURRENT BILLS & APPEND BACKUP BILLS ---
+      await initDatabase();
+      const liveDb = await getDB();
+
+      // Count existing live orders
+      try {
+        if (typeof liveDb.getAllAsync === "function") {
+          const oRows = await liveDb.getAllAsync("SELECT COUNT(*) as count FROM orders;");
+          preservedOrdersCount = oRows[0]?.count || 0;
+        }
+      } catch {}
+
+      // Copy staged DB into SQLite folder so expo-sqlite can open it as a temporary database
+      const tempDbName = `cocobae_merge_temp_${Date.now()}.db`;
+      const tempDbPath = `${dbDir}${tempDbName}`;
+      await FileSystem.copyAsync({ from: stagedDb, to: tempDbPath });
+
+      let backupDb: any = null;
+      if (typeof (SQLite as any).openDatabaseAsync === "function") {
+        backupDb = await (SQLite as any).openDatabaseAsync(tempDbName);
+      } else if (typeof (SQLite as any).openDatabaseSync === "function") {
+        backupDb = (SQLite as any).openDatabaseSync(tempDbName);
+      } else {
+        backupDb = (SQLite as any).openDatabase(tempDbName);
+      }
+
+      try {
+        // 1. Merge Categories
+        let backupCategories: any[] = [];
+        try {
+          if (typeof backupDb.getAllAsync === "function") {
+            backupCategories = await backupDb.getAllAsync("SELECT * FROM categories;");
+          }
+        } catch {}
+
+        const liveCategories: any[] = typeof liveDb.getAllAsync === "function"
+          ? await liveDb.getAllAsync("SELECT name FROM categories;")
+          : [];
+        const liveCatNames = new Set(liveCategories.map((c: any) => String(c.name || "").toLowerCase().trim()));
+
+        for (const cat of backupCategories) {
+          const cleanName = String(cat.name || "").trim();
+          if (cleanName && !liveCatNames.has(cleanName.toLowerCase())) {
+            try {
+              await liveDb.runAsync(
+                "INSERT INTO categories (name, emoji, grad_from, grad_to, sort_order) VALUES (?, ?, ?, ?, ?);",
+                [cat.name, cat.emoji, cat.grad_from, cat.grad_to, cat.sort_order ?? 0]
+              );
+              liveCatNames.add(cleanName.toLowerCase());
+            } catch {}
+          }
+        }
+
+        // 2. Merge Products
+        let backupProducts: any[] = [];
+        try {
+          if (typeof backupDb.getAllAsync === "function") {
+            backupProducts = await backupDb.getAllAsync("SELECT * FROM products;");
+          }
+        } catch {}
+
+        const liveProducts: any[] = typeof liveDb.getAllAsync === "function"
+          ? await liveDb.getAllAsync("SELECT name FROM products;")
+          : [];
+        const liveProdNames = new Set(liveProducts.map((p: any) => String(p.name || "").toLowerCase().trim()));
+
+        for (const prod of backupProducts) {
+          const cleanProd = String(prod.name || "").trim();
+          if (cleanProd && !liveProdNames.has(cleanProd.toLowerCase())) {
+            try {
+              await liveDb.runAsync(
+                `INSERT INTO products (
+                  name, description, price, category_id, image_path, is_veg, is_available, stock_quantity, sort_order
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+                [
+                  prod.name,
+                  prod.description || "",
+                  prod.price,
+                  prod.category_id,
+                  prod.image_path || null,
+                  prod.is_veg ?? 1,
+                  prod.is_available ?? 1,
+                  prod.stock_quantity ?? 0,
+                  prod.sort_order ?? 0,
+                ]
+              );
+              liveProdNames.add(cleanProd.toLowerCase());
+            } catch {}
+          }
+        }
+
+        // 3. Merge Orders & Order Items
+        let backupOrders: any[] = [];
+        try {
+          if (typeof backupDb.getAllAsync === "function") {
+            backupOrders = await backupDb.getAllAsync("SELECT * FROM orders ORDER BY id ASC;");
+          }
+        } catch {}
+
+        const liveOrders: any[] = typeof liveDb.getAllAsync === "function"
+          ? await liveDb.getAllAsync("SELECT order_number FROM orders;")
+          : [];
+        const liveOrderNums = new Set(liveOrders.map((o: any) => String(o.order_number || "")));
+
+        for (const bo of backupOrders) {
+          if (!bo.order_number || liveOrderNums.has(bo.order_number)) {
+            // Already present in live orders — skip to prevent duplicate bills!
+            continue;
+          }
+
+          try {
+            const insRes = await liveDb.runAsync(
+              `INSERT INTO orders (
+                order_number, order_date, total_amount, gst_amount, payment_method,
+                customer_name, customer_phone, note, status, order_type,
+                discount_type, discount_value, discount_amount, delivery_charge,
+                extra_charge_name, extra_charges_json
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+              [
+                bo.order_number,
+                bo.order_date,
+                bo.total_amount,
+                bo.gst_amount ?? 0,
+                bo.payment_method || "cash",
+                bo.customer_name || "Walk In Customer",
+                bo.customer_phone || "",
+                bo.note || "",
+                bo.status || "completed",
+                bo.order_type || "dine_in",
+                bo.discount_type || "none",
+                bo.discount_value ?? 0,
+                bo.discount_amount ?? 0,
+                bo.delivery_charge ?? 0,
+                bo.extra_charge_name || "Delivery Charge",
+                bo.extra_charges_json || null,
+              ]
+            );
+            const newOrderId = insRes.lastInsertRowId;
+            liveOrderNums.add(bo.order_number);
+            mergedOrdersCount++;
+
+            // Fetch line items for this order from backupDb
+            let items: any[] = [];
+            try {
+              items = await backupDb.getAllAsync("SELECT * FROM order_items WHERE order_id = ?;", [bo.id]);
+            } catch {}
+
+            for (const item of items) {
+              try {
+                await liveDb.runAsync(
+                  `INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, subtotal)
+                   VALUES (?, ?, ?, ?, ?, ?);`,
+                  [newOrderId, item.product_id, item.product_name, item.quantity, item.unit_price, item.subtotal]
+                );
+              } catch {}
+            }
+          } catch (ordErr) {
+            console.warn("Order merge notice:", bo.order_number, ordErr);
+          }
+        }
+      } finally {
+        if (backupDb && typeof backupDb.closeAsync === "function") {
+          try {
+            await backupDb.closeAsync();
+          } catch {}
+        }
+        try {
+          await FileSystem.deleteAsync(tempDbPath, { idempotent: true });
+        } catch {}
+      }
+    } else {
+      // --- FULL OVERWRITE MODE: COMPLETE REPLACEMENT ---
+      const dInfo = await FileSystem.getInfoAsync(dbDir);
+      if (!dInfo.exists) {
+        await FileSystem.makeDirectoryAsync(dbDir, { intermediates: true });
+      }
+
+      await FileSystem.copyAsync({ from: stagedDb, to: liveDbPath });
+
+      // Also copy to fallback path
+      const fallbackPath = `${docDir}${DB_FILE_NAME}`;
+      try {
+        await FileSystem.copyAsync({ from: stagedDb, to: fallbackPath });
+      } catch {}
+
+      // Reset database instance connection to force re-open of newly restored file
+      await resetDB();
+
+      // Re-run database migrations so restored backups from older versions get all new columns!
+      await initDatabase();
     }
 
-    await FileSystem.copyAsync({ from: stagedDb, to: liveDbPath });
-
-    // Also copy to fallback path
-    const fallbackPath = `${docDir}${DB_FILE_NAME}`;
-    try {
-      await FileSystem.copyAsync({ from: stagedDb, to: fallbackPath });
-    } catch {
-      // Ignored
-    }
-
-    // Reset database instance connection to force re-open of newly restored file
-    await resetDB();
-
-    // Re-run database migrations so restored backups from older versions get all new columns!
-    await initDatabase();
-
-    // 5. Connect and normalize all image paths in the restored database
+    // Connect and normalize all image paths in the active database
     const db = await getDB();
-
-    // Normalize any legacy absolute paths to portable relative paths
     try {
       if (typeof db.execAsync === "function") {
         await db.execAsync(`
@@ -542,7 +721,7 @@ export async function restoreFullBackup(fileUri: string): Promise<{
       console.warn("[BackupMigration] Path normalization note:", normErr);
     }
 
-    // 6. Post-restore verification
+    // Post-restore verification
     let productCount = 0;
     let orderCount = 0;
     try {
@@ -556,7 +735,7 @@ export async function restoreFullBackup(fileUri: string): Promise<{
       console.warn("[BackupMigration] Post-restore count note:", verErr);
     }
 
-    // 7. Clean up staging directory
+    // Clean up staging directory
     await FileSystem.deleteAsync(stagingDir, { idempotent: true });
 
     return {
@@ -564,6 +743,9 @@ export async function restoreFullBackup(fileUri: string): Promise<{
       restoredProducts: productCount,
       restoredImages: restoredImagesCount,
       restoredOrders: orderCount,
+      mergedOrdersCount,
+      preservedOrdersCount,
+      mode,
     };
   } catch (restoreErr: any) {
     console.error("[BackupMigration] Restore failure. Initiating rollback...", restoreErr);

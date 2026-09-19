@@ -81,6 +81,7 @@ export const SettingsScreen: React.FC = () => {
   const [restoreValidation, setRestoreValidation] = useState<BackupValidationResult | null>(null);
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [validating, setValidating] = useState(false);
+  const [restoreMode, setRestoreMode] = useState<"merge" | "overwrite">("merge");
 
   // Settings state
   const [cafeName, setCafeName] = useState("CocoBae");
@@ -362,6 +363,7 @@ export const SettingsScreen: React.FC = () => {
   const openRestoreModal = async (uri: string, name: string) => {
     setRestoreTargetUri(uri);
     setRestoreTargetName(name);
+    setRestoreMode("merge"); // Default to Smart Merge!
     setValidating(true);
     setRestoreModalVisible(true);
     try {
@@ -404,12 +406,19 @@ export const SettingsScreen: React.FC = () => {
     if (!restoreTargetUri) return;
     setRestoreLoading(true);
     try {
-      const res = await restoreFullBackup(restoreTargetUri);
+      const res = await restoreFullBackup(restoreTargetUri, restoreMode);
       setRestoreModalVisible(false);
-      Alert.alert(
-        "✅ Restore Completed!",
-        `Device migration succeeded!\n\n• Products: ${res.restoredProducts}\n• Dessert Photos Restored: ${res.restoredImages}\n• Orders: ${res.restoredOrders}\n\nAll data and images are now active.`,
-      );
+      if (res.mode === "merge") {
+        Alert.alert(
+          "✅ Smart Merge Completed!",
+          `Bills and menu data synchronized!\n\n• Current Bills Preserved: ${res.preservedOrdersCount || 0}\n• Backup Bills Imported: ${res.mergedOrdersCount || 0}\n• Total Active Bills: ${res.restoredOrders}\n• Active Products: ${res.restoredProducts}\n• Dessert Photos: ${res.restoredImages}\n\nZero duplicates. Both your new and old bills are active!`,
+        );
+      } else {
+        Alert.alert(
+          "✅ Full Restore Completed!",
+          `Device migration succeeded!\n\n• Products: ${res.restoredProducts}\n• Dessert Photos Restored: ${res.restoredImages}\n• Orders: ${res.restoredOrders}\n\nAll data replaced from backup.`,
+        );
+      }
       loadSettingsAndBackups();
     } catch (err: any) {
       Alert.alert("Restore Failed", err.message || "Could not restore backup.");
@@ -1887,13 +1896,80 @@ export const SettingsScreen: React.FC = () => {
                   </View>
                 </View>
 
-                {/* Warning note */}
-                <Text style={{ color: THEME.colors.textMuted, fontSize: 11, fontStyle: "italic", textAlign: "center" }}>
-                  Current menu, categories, and orders will be replaced with this backup.
-                </Text>
+                {/* Restore Mode Selector */}
+                <View style={{ gap: 8, marginTop: 2 }}>
+                  <Text style={{ color: THEME.colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 0.5 }}>
+                    SELECT RESTORE ACTION
+                  </Text>
+                  
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    {/* Option 1: Smart Merge (Recommended) */}
+                    <TouchableOpacity
+                      onPress={() => setRestoreMode("merge")}
+                      activeOpacity={0.8}
+                      style={{
+                        flex: 1,
+                        padding: 10,
+                        borderRadius: THEME.radius.md,
+                        borderWidth: 1.5,
+                        borderColor: restoreMode === "merge" ? THEME.colors.primary : THEME.colors.border,
+                        backgroundColor: restoreMode === "merge" ? "rgba(245, 166, 35, 0.12)" : THEME.colors.surface2,
+                        alignItems: "center",
+                        gap: 2,
+                      }}
+                    >
+                      <Text style={{ color: restoreMode === "merge" ? THEME.colors.primary : THEME.colors.text, fontWeight: "800", fontSize: 12 }}>
+                        ⚡ Smart Merge
+                      </Text>
+                      <Text style={{ color: THEME.colors.textMuted, fontSize: 10 }}>
+                        (Recommended)
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Option 2: Full Overwrite */}
+                    <TouchableOpacity
+                      onPress={() => setRestoreMode("overwrite")}
+                      activeOpacity={0.8}
+                      style={{
+                        flex: 1,
+                        padding: 10,
+                        borderRadius: THEME.radius.md,
+                        borderWidth: 1.5,
+                        borderColor: restoreMode === "overwrite" ? THEME.colors.danger : THEME.colors.border,
+                        backgroundColor: restoreMode === "overwrite" ? "rgba(229, 57, 53, 0.12)" : THEME.colors.surface2,
+                        alignItems: "center",
+                        gap: 2,
+                      }}
+                    >
+                      <Text style={{ color: restoreMode === "overwrite" ? THEME.colors.danger : THEME.colors.text, fontWeight: "800", fontSize: 12 }}>
+                        🔄 Full Overwrite
+                      </Text>
+                      <Text style={{ color: THEME.colors.textMuted, fontSize: 10 }}>
+                        Replace All
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Dynamic explanation banner based on selected mode */}
+                  <View
+                    style={{
+                      backgroundColor: restoreMode === "merge" ? "rgba(245, 166, 35, 0.08)" : "rgba(229, 57, 53, 0.08)",
+                      borderRadius: THEME.radius.sm,
+                      padding: 10,
+                      borderLeftWidth: 3,
+                      borderLeftColor: restoreMode === "merge" ? THEME.colors.primary : THEME.colors.danger,
+                    }}
+                  >
+                    <Text style={{ color: THEME.colors.text, fontSize: 11, lineHeight: 15 }}>
+                      {restoreMode === "merge"
+                        ? "🛡️ Smart Merge keeps any new bills you created and appends missing historical bills from this backup. Zero duplicate orders, zero data lost!"
+                        : "⚠️ Full Overwrite replaces your active database completely with this backup. Any new bills punched since this backup will be wiped."}
+                    </Text>
+                  </View>
+                </View>
 
                 {/* Modal Buttons */}
-                <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 6 }}>
                   <Button
                     onPress={() => setRestoreModalVisible(false)}
                     variant="ghost"
@@ -1904,12 +1980,12 @@ export const SettingsScreen: React.FC = () => {
                   </Button>
                   <Button
                     onPress={handleExecuteRestore}
-                    variant="primary"
+                    variant={restoreMode === "merge" ? "primary" : "danger"}
                     loading={restoreLoading}
                     icon={<RotateCcw size={16} color="#FFF" />}
                     style={{ flex: 1 }}
                   >
-                    Confirm & Restore
+                    {restoreMode === "merge" ? "Smart Merge Now" : "Confirm Overwrite"}
                   </Button>
                 </View>
               </View>
