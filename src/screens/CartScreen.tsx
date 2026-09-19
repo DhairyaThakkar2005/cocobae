@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -65,17 +65,40 @@ export const CartScreen: React.FC<CartScreenProps> = ({
   const gstAmount = getGstAmount();
   const grandTotal = getGrandTotal();
 
+  // On mount and whenever orderType is takeaway, ensure default delivery charge is applied if enabled
+  useEffect(() => {
+    if (orderType === "takeaway") {
+      getAllSettings().then((s) => {
+        const isEnabled =
+          s.delivery_enabled === undefined ||
+          s.delivery_enabled === "1" ||
+          s.delivery_enabled === "true";
+        if (isEnabled) {
+          const defaultCharge = parseFloat(s.delivery_charge || "30") || 30;
+          setDeliveryCharge(defaultCharge);
+          setExtraChargeName(s.extra_charge_name || "Packaging / Delivery");
+        }
+      }).catch(() => {});
+    }
+  }, [orderType]);
+
   const handleSelectOrderType = async (type: "dine_in" | "takeaway") => {
     setOrderType(type);
     if (type === "takeaway") {
       try {
         const s = await getAllSettings();
-        if (s.delivery_enabled === "1" && s.delivery_charge) {
-          const defaultCharge = parseFloat(s.delivery_charge) || 0;
-          setDeliveryCharge(defaultCharge);
+        const isEnabled =
+          s.delivery_enabled === undefined ||
+          s.delivery_enabled === "1" ||
+          s.delivery_enabled === "true";
+        const chargeNum = parseFloat(s.delivery_charge || "30") || 30;
+        if (isEnabled || chargeNum > 0) {
+          setDeliveryCharge(chargeNum);
           setExtraChargeName(s.extra_charge_name || "Packaging / Delivery");
         }
-      } catch {}
+      } catch (err) {
+        console.warn("Could not load delivery settings:", err);
+      }
     } else {
       setDeliveryCharge(0);
       setExtraChargeName("");

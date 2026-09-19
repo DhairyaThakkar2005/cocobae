@@ -215,10 +215,10 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
                     : ""
                 }
                 ${
-                  order.delivery_charge && order.delivery_charge > 0
+                  Number(order.delivery_charge || 0) > 0
                     ? `<tr>
-                        <td style="padding: 3px 0; font-size: 13px; font-weight: 700;">${order.extra_charge_name || "Extra Charge"}:</td>
-                        <td style="text-align: right; padding: 3px 0; font-size: 13px; font-weight: 700;">+Rs. ${Math.round(order.delivery_charge)}</td>
+                        <td style="padding: 3px 0; font-size: 13px; font-weight: 700;">${order.extra_charge_name || "Packaging / Delivery"}:</td>
+                        <td style="text-align: right; padding: 3px 0; font-size: 13px; font-weight: 700;">+Rs. ${Math.round(Number(order.delivery_charge))}</td>
                       </tr>`
                     : ""
                 }
@@ -320,10 +320,10 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
                   : ""
               }
               ${
-                order.delivery_charge && order.delivery_charge > 0
+                Number(order.delivery_charge || 0) > 0
                   ? `<div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
-                      <span>Delivery Charge:</span>
-                      <span>+Rs. ${Math.round(order.delivery_charge)}</span>
+                      <span>${order.extra_charge_name || "Packaging / Delivery"}:</span>
+                      <span>+Rs. ${Math.round(Number(order.delivery_charge))}</span>
                     </div>`
                   : ""
               }
@@ -674,12 +674,12 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
             </View>
           ) : null}
 
-          {order.delivery_charge && order.delivery_charge > 0 ? (
+          {Number(order.delivery_charge || 0) > 0 ? (
             <View
               style={{ flexDirection: "row", justifyContent: "space-between" }}
             >
               <Text style={{ color: THEME.colors.textMuted, fontSize: 13 }}>
-                {order.extra_charge_name || "Extra Charge"}:
+                {order.extra_charge_name || "Packaging / Delivery"}:
               </Text>
               <Text
                 style={{
@@ -688,7 +688,7 @@ export const BillReceipt: React.FC<BillReceiptProps> = ({
                   fontWeight: "600",
                 }}
               >
-                +{formatINR(order.delivery_charge)}
+                +{formatINR(Number(order.delivery_charge))}
               </Text>
             </View>
           ) : null}

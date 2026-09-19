@@ -185,6 +185,7 @@ export const SettingsScreen: React.FC = () => {
         setSetting("gst_percent", gstPercent.trim() || "5"),
         setSetting("delivery_charge", deliveryCharge.trim() || "0"),
         setSetting("delivery_enabled", deliveryEnabled ? "1" : "0"),
+        setSetting("extra_charge_name", "Packaging / Delivery"),
         setSetting("auto_backup_enabled", autoBackupEnabled ? "1" : "0"),
         setSetting("backup_time", backupTime.trim() || "02:00"),
         setSetting("retention_days", retentionDays.trim() || "7"),
@@ -669,7 +670,14 @@ export const SettingsScreen: React.FC = () => {
           </View>
           <Switch
             value={deliveryEnabled}
-            onValueChange={setDeliveryEnabled}
+            onValueChange={async (val) => {
+              setDeliveryEnabled(val);
+              try {
+                await setSetting("delivery_enabled", val ? "1" : "0");
+              } catch (e) {
+                console.error("Failed to save delivery_enabled:", e);
+              }
+            }}
             trackColor={{ false: "#444", true: THEME.colors.primary }}
             thumbColor="#FFF"
           />
@@ -678,7 +686,14 @@ export const SettingsScreen: React.FC = () => {
         <Input
           label="Default Delivery Charge (₹)"
           value={deliveryCharge}
-          onChangeText={setDeliveryCharge}
+          onChangeText={async (val) => {
+            setDeliveryCharge(val);
+            try {
+              await setSetting("delivery_charge", val.trim() || "0");
+            } catch (e) {
+              console.error("Failed to save delivery_charge:", e);
+            }
+          }}
           placeholder="e.g. 30"
           keyboardType="numeric"
         />

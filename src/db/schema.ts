@@ -342,6 +342,9 @@ export async function resetDatabaseToNewMenu(db: any) {
     ["upi_id", "7043338863m@pnb"],
     ["gst_enabled", "0"],
     ["gst_percent", "5"],
+    ["delivery_enabled", "1"],
+    ["delivery_charge", "30"],
+    ["extra_charge_name", "Packaging / Delivery"],
     ["auto_backup_enabled", "1"],
     ["backup_time", "02:00"],
     ["retention_days", "7"],
@@ -353,7 +356,7 @@ export async function resetDatabaseToNewMenu(db: any) {
   for (const [key, val] of defaultSettings) {
     await executeQuery(
       db,
-      "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+      "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
       [key, val],
     );
   }

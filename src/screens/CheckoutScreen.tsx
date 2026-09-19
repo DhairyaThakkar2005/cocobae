@@ -173,13 +173,28 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         storeCity: s.store_city || "Vadodara",
         upiId: s.upi_id || "7043338863m@pnb",
       });
-      if (s.delivery_enabled === "1" && s.delivery_charge && deliveryCharge === 0 && orderType === "takeaway") {
-        const defaultCharge = parseFloat(s.delivery_charge) || 0;
-        setDeliveryCharge(defaultCharge);
-        setDeliveryInput(defaultCharge > 0 ? defaultCharge.toString() : "");
+      const isEnabled =
+        s.delivery_enabled === undefined ||
+        s.delivery_enabled === "1" ||
+        s.delivery_enabled === "true";
+      if (orderType === "takeaway") {
+        const defaultCharge = parseFloat(s.delivery_charge || "30") || 30;
+        const name = s.extra_charge_name || "Packaging / Delivery";
+        if (isEnabled && (deliveryCharge === 0 || !deliveryCharge)) {
+          setDeliveryCharge(defaultCharge);
+          setDeliveryInput(defaultCharge.toString());
+          setChargeNameInput(name);
+          setExtraChargeName(name);
+        } else if (deliveryCharge > 0) {
+          setDeliveryInput(deliveryCharge.toString());
+          setChargeNameInput(extraChargeName || name);
+        }
+      } else {
+        setDeliveryCharge(0);
+        setDeliveryInput("");
       }
-    });
-  }, []);
+    }).catch(() => {});
+  }, [orderType]);
 
   const totalItems = getTotalItemsCount();
   const subtotal = getSubtotal();
@@ -218,15 +233,21 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     if (type === "takeaway") {
       try {
         const s = await getAllSettings();
-        if (s.delivery_enabled === "1" && s.delivery_charge) {
-          const defaultCharge = parseFloat(s.delivery_charge) || 0;
+        const isEnabled =
+          s.delivery_enabled === undefined ||
+          s.delivery_enabled === "1" ||
+          s.delivery_enabled === "true";
+        const defaultCharge = parseFloat(s.delivery_charge || "30") || 30;
+        const name = s.extra_charge_name || "Packaging / Delivery";
+        if (isEnabled || defaultCharge > 0) {
           setDeliveryCharge(defaultCharge);
-          setDeliveryInput(defaultCharge > 0 ? defaultCharge.toString() : "");
-          const name = s.extra_charge_name || "Packaging / Delivery";
+          setDeliveryInput(defaultCharge.toString());
           setChargeNameInput(name);
           setExtraChargeName(name);
         }
-      } catch {}
+      } catch (err) {
+        console.warn("Could not load delivery settings:", err);
+      }
     } else {
       setDeliveryCharge(0);
       setDeliveryInput("");
@@ -243,6 +264,10 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
 
     setLoading(true);
     try {
+      const finalDeliveryCharge = orderType === "takeaway" ? (deliveryCharge || 0) : 0;
+      const finalChargeName =
+        chargeNameInput.trim() || extraChargeName.trim() || "Packaging / Delivery";
+
       const orderPayload = {
         order_number: "",
         order_date: "",
@@ -257,8 +282,8 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         discount_type: selectedOffer ? ("offer" as const) : discountType,
         discount_value: selectedOffer ? selectedOffer.discount_value : discountValue,
         discount_amount: discountAmount,
-        delivery_charge: deliveryCharge || 0,
-        extra_charge_name: chargeNameInput.trim() || extraChargeName.trim() || "Extra Charge",
+        delivery_charge: finalDeliveryCharge,
+        extra_charge_name: finalChargeName,
       };
 
       const itemsPayload = items.map((it) => ({
@@ -592,7 +617,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
             ) : null}
 
             {/* Extra Charges if applied */}
-            {successOrder.delivery_charge && successOrder.delivery_charge > 0 ? (
+            {Number(successOrder.delivery_charge || 0) > 0 ? (
               <View
                 style={{
                   flexDirection: "row",
@@ -601,10 +626,10 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 }}
               >
                 <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
-                  {successOrder.extra_charge_name || "Extra Charge"}
+                  {successOrder.extra_charge_name || "Packaging / Delivery"}
                 </Text>
                 <Text style={{ color: THEME.colors.text, fontSize: 13, fontWeight: "700" }}>
-                  +{formatINR(successOrder.delivery_charge)}
+                  +{formatINR(Number(successOrder.delivery_charge))}
                 </Text>
               </View>
             ) : null}
