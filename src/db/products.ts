@@ -144,6 +144,40 @@ export async function updateProduct(
   ];
 
   if (stockQty !== undefined) {
+    try {
+      let prevStock = 0;
+      let prodName = product.name || "Product";
+      const fetchSql = `SELECT name, stock_quantity FROM products WHERE id = ?`;
+      if (typeof db.getFirstAsync === "function") {
+        const row: any = await db.getFirstAsync(fetchSql, [id]);
+        if (row) {
+          prevStock = row.stock_quantity || 0;
+          prodName = row.name || prodName;
+        }
+      }
+      if (stockQty !== prevStock) {
+        const diff = stockQty - prevStock;
+        const changeType = diff > 0 ? "restock" : "adjustment";
+        const logSql = `
+          INSERT INTO product_stock_logs (product_id, product_name, change_type, quantity_changed, previous_stock, new_stock, note)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `;
+        if (typeof db.runAsync === "function") {
+          await db.runAsync(logSql, [
+            id,
+            prodName,
+            changeType,
+            Math.abs(diff),
+            prevStock,
+            stockQty,
+            diff > 0 ? "Stock Added via Edit Product" : "Stock Adjusted via Edit Product",
+          ]);
+        }
+      }
+    } catch (e) {
+      console.warn("Stock log notice:", e);
+    }
+
     sql += `, stock_quantity = ?`;
     params.push(stockQty);
   }

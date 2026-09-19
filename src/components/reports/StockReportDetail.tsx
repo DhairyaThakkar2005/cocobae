@@ -177,9 +177,9 @@ export const StockReportDetail: React.FC<StockReportDetailProps> = ({
       <View
         style={{
           flexDirection: "row",
-          paddingHorizontal: 16,
-          paddingVertical: 10,
-          gap: 10,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          gap: 8,
           backgroundColor: THEME.colors.surface2,
           borderBottomWidth: 1,
           borderBottomColor: THEME.colors.border,
@@ -187,13 +187,15 @@ export const StockReportDetail: React.FC<StockReportDetailProps> = ({
       >
         <TouchableOpacity
           onPress={() => setActiveSubTab("overview")}
+          activeOpacity={0.8}
           style={{
             flex: 1,
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "center",
             gap: 6,
-            paddingVertical: 8,
+            paddingVertical: 9,
+            paddingHorizontal: 6,
             borderRadius: THEME.radius.md,
             backgroundColor:
               activeSubTab === "overview"
@@ -215,28 +217,32 @@ export const StockReportDetail: React.FC<StockReportDetailProps> = ({
             }
           />
           <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
             style={{
               color:
                 activeSubTab === "overview"
                   ? THEME.colors.textInverse
                   : THEME.colors.text,
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: "700",
             }}
           >
-            Stock Overview & Balance
+            Stock Balance
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => setActiveSubTab("history")}
+          activeOpacity={0.8}
           style={{
             flex: 1,
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "center",
             gap: 6,
-            paddingVertical: 8,
+            paddingVertical: 9,
+            paddingHorizontal: 6,
             borderRadius: THEME.radius.md,
             backgroundColor:
               activeSubTab === "history"
@@ -258,16 +264,18 @@ export const StockReportDetail: React.FC<StockReportDetailProps> = ({
             }
           />
           <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
             style={{
               color:
                 activeSubTab === "history"
                   ? THEME.colors.textInverse
                   : THEME.colors.text,
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: "700",
             }}
           >
-            Arrival / Restock History
+            Restock History
           </Text>
         </TouchableOpacity>
       </View>

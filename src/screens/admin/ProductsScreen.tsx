@@ -16,7 +16,6 @@ import {
   getProducts,
   addProduct,
   updateProduct,
-  updateProductStock,
   deleteProduct,
   toggleProductAvailability,
   Product,
@@ -25,7 +24,6 @@ import { getCategories, Category } from "../../db/categories";
 import { formatINR } from "../../lib/utils";
 import {
   Plus,
-  Minus,
   Edit3,
   Trash2,
   Search,
@@ -229,24 +227,6 @@ export const ProductsScreen: React.FC = () => {
     }
   };
 
-  const handleInlineStockChange = async (
-    productId: number,
-    newStock: number,
-  ) => {
-    const safeStock = Math.max(0, newStock);
-    // Optimistically update products list
-    setProducts((prev) =>
-      prev.map((p) =>
-        p.id === productId ? { ...p, stock_quantity: safeStock } : p,
-      ),
-    );
-    try {
-      await updateProductStock(productId, safeStock, "Quick Stock Adjust");
-    } catch (err: any) {
-      Alert.alert("Error", "Failed to update stock: " + (err.message || "Unknown error"));
-      loadData();
-    }
-  };
 
   const handleDelete = (id: number, name: string) => {
     Alert.alert(
@@ -424,16 +404,18 @@ export const ProductsScreen: React.FC = () => {
                   {formatINR(p.price)}
                 </Text>
 
-                {/* Direct Stock Stepper / Input */}
+                {/* Stock Status Badge */}
                 <View
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    backgroundColor: THEME.colors.surface2,
-                    borderRadius: THEME.radius.md,
-                    paddingHorizontal: 4,
-                    paddingVertical: 2,
-                    gap: 4,
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: THEME.radius.sm,
+                    backgroundColor:
+                      (p.stock_quantity ?? 0) <= 0
+                        ? "rgba(239, 68, 68, 0.12)"
+                        : (p.stock_quantity ?? 0) < 5
+                          ? "rgba(245, 158, 11, 0.12)"
+                          : THEME.colors.surface2,
                     borderWidth: 1,
                     borderColor:
                       (p.stock_quantity ?? 0) <= 0
@@ -445,80 +427,20 @@ export const ProductsScreen: React.FC = () => {
                 >
                   <Text
                     style={{
-                      fontSize: 9,
+                      fontSize: 11,
                       fontWeight: "700",
-                      color: THEME.colors.textMuted,
-                      marginLeft: 2,
-                    }}
-                  >
-                    STOCK:
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() =>
-                      handleInlineStockChange(
-                        p.id,
-                        (p.stock_quantity ?? 0) - 1,
-                      )
-                    }
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                    style={{
-                      width: 22,
-                      height: 22,
-                      borderRadius: 4,
-                      backgroundColor: THEME.colors.surface,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      borderWidth: 1,
-                      borderColor: THEME.colors.border,
-                    }}
-                  >
-                    <Minus size={11} color={THEME.colors.text} />
-                  </TouchableOpacity>
-
-                  <TextInput
-                    key={`stock-${p.id}-${p.stock_quantity}`}
-                    defaultValue={String(p.stock_quantity ?? 0)}
-                    keyboardType="numeric"
-                    onEndEditing={(e) => {
-                      const val = parseInt(e.nativeEvent.text, 10);
-                      handleInlineStockChange(
-                        p.id,
-                        isNaN(val) || val < 0 ? 0 : val,
-                      );
-                    }}
-                    style={{
                       color:
                         (p.stock_quantity ?? 0) <= 0
                           ? THEME.colors.danger
-                          : THEME.colors.text,
-                      fontSize: 12,
-                      fontWeight: "800",
-                      minWidth: 28,
-                      textAlign: "center",
-                      paddingVertical: 0,
-                      paddingHorizontal: 2,
-                    }}
-                  />
-
-                  <TouchableOpacity
-                    onPress={() =>
-                      handleInlineStockChange(
-                        p.id,
-                        (p.stock_quantity ?? 0) + 1,
-                      )
-                    }
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                    style={{
-                      width: 22,
-                      height: 22,
-                      borderRadius: 4,
-                      backgroundColor: THEME.colors.primary,
-                      justifyContent: "center",
-                      alignItems: "center",
+                          : (p.stock_quantity ?? 0) < 5
+                            ? "#F59E0B"
+                            : THEME.colors.textMuted,
                     }}
                   >
-                    <Plus size={11} color={THEME.colors.textInverse} />
-                  </TouchableOpacity>
+                    {(p.stock_quantity ?? 0) <= 0
+                      ? "Out of Stock"
+                      : `Stock: ${p.stock_quantity} units`}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -612,6 +534,16 @@ export const ProductsScreen: React.FC = () => {
           placeholder="0"
           keyboardType="numeric"
         />
+        <Text
+          style={{
+            color: THEME.colors.textMuted,
+            fontSize: 11,
+            marginTop: -6,
+            marginBottom: 12,
+          }}
+        >
+          Stock updates here automatically sync with inventory & restock history logs.
+        </Text>
 
         <Input
           label="Description"
