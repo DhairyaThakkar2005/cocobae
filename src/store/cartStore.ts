@@ -9,6 +9,12 @@ export interface CartItem {
   subtotal: number;
 }
 
+export interface ExtraChargeItem {
+  id: string;
+  name: string;
+  amount: number;
+}
+
 interface CartStore {
   items: CartItem[];
   customerName: string;
@@ -22,6 +28,7 @@ interface CartStore {
   selectedOffer: Offer | null;
   deliveryCharge: number;
   extraChargeName: string;
+  extraCharges: ExtraChargeItem[];
   orderType: "dine_in" | "takeaway";
 
   setSettings: (gstEnabled: boolean, gstPercent: number) => void;
@@ -34,6 +41,12 @@ interface CartStore {
   clearDiscount: () => void;
   setDeliveryCharge: (charge: number) => void;
   setExtraChargeName: (name: string) => void;
+  addExtraCharge: (name?: string, amount?: number) => void;
+  updateExtraCharge: (id: string, name: string, amount: number) => void;
+  removeExtraCharge: (id: string) => void;
+  clearExtraCharges: () => void;
+  setExtraCharges: (charges: ExtraChargeItem[]) => void;
+  getExtraChargesTotal: () => number;
 
   addItem: (product: Product, quantity?: number, note?: string) => void;
   updateQuantity: (productId: number, delta: number) => void;
@@ -62,6 +75,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
   selectedOffer: null,
   deliveryCharge: 0,
   extraChargeName: "",
+  extraCharges: [],
   orderType: "dine_in",
 
   setSettings: (gstEnabled, gstPercent) => set({ gstEnabled, gstPercent }),
@@ -88,6 +102,50 @@ export const useCartStore = create<CartStore>((set, get) => ({
     set({ deliveryCharge: Math.max(0, Math.round(charge || 0)) }),
   setExtraChargeName: (name: string) =>
     set({ extraChargeName: name }),
+
+  addExtraCharge: (name = "", amount = 0) => {
+    set((state) => ({
+      extraCharges: [
+        ...state.extraCharges,
+        {
+          id: `ec_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          name,
+          amount: Math.max(0, Math.round(amount || 0)),
+        },
+      ],
+    }));
+  },
+
+  updateExtraCharge: (id, name, amount) => {
+    set((state) => ({
+      extraCharges: state.extraCharges.map((c) =>
+        c.id === id
+          ? { ...c, name, amount: Math.max(0, Math.round(amount || 0)) }
+          : c,
+      ),
+    }));
+  },
+
+  removeExtraCharge: (id) => {
+    set((state) => ({
+      extraCharges: state.extraCharges.filter((c) => c.id !== id),
+    }));
+  },
+
+  clearExtraCharges: () => {
+    set({ extraCharges: [] });
+  },
+
+  setExtraCharges: (charges) => {
+    set({ extraCharges: charges });
+  },
+
+  getExtraChargesTotal: () => {
+    return get().extraCharges.reduce(
+      (sum, c) => sum + (Number(c.amount) || 0),
+      0,
+    );
+  },
 
   addItem: (product, quantity = 1, note = "") => {
     set((state) => {
@@ -181,6 +239,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
       selectedOffer: null,
       deliveryCharge: 0,
       extraChargeName: "",
+      extraCharges: [],
       orderType: "dine_in",
     });
   },
@@ -231,7 +290,8 @@ export const useCartStore = create<CartStore>((set, get) => ({
     const subtotal = get().getSubtotal();
     const discount = get().getDiscountAmount();
     const gst = get().getGstAmount();
-    const delivery = get().deliveryCharge || 0;
-    return Math.max(0, Math.round(subtotal - discount + gst + delivery));
+    const delivery = get().orderType === "takeaway" ? (get().deliveryCharge || 0) : 0;
+    const extraTotal = get().getExtraChargesTotal();
+    return Math.max(0, Math.round(subtotal - discount + gst + delivery + extraTotal));
   },
 }));

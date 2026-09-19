@@ -9,6 +9,7 @@ export interface InvoiceOptions {
   storePhone?: string;
   storeCity?: string;
   upiId?: string;
+  fssaiNumber?: string;
 }
 
 /**
@@ -27,6 +28,7 @@ export async function generateInvoicePdf(
   const storePhone = options.storePhone || "7043338863";
   const storeCity = options.storeCity || "Vadodara";
   const upiId = options.upiId || "7043338863m@pnb";
+  const fssaiNumber = options.fssaiNumber || "20726032004123";
 
   const formattedDate = new Date(order.order_date || Date.now()).toLocaleString(
     "en-IN",
@@ -82,6 +84,7 @@ export async function generateInvoicePdf(
         <div style="text-align: center; border-bottom: 2px dashed #333; padding-bottom: 10px;">
           <h1 style="color: #0F0A06; margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 0.5px;">${cafeName}</h1>
           <p style="color: #444; margin: 4px auto; font-size: 11px; max-width: 360px; line-height: 1.3;">${storeAddress}</p>
+          ${fssaiNumber ? `<p style="color: #444; margin: 2px auto; font-size: 11px; font-weight: 700;">FSSAI: ${fssaiNumber}</p>` : ""}
           <p style="color: #555; margin: 2px 0; font-size: 12px;">${storeCity} • Contact: ${storePhone}</p>
           <p style="color: #222; margin: 5px 0 2px 0; font-size: 13px;">Invoice ID: <b>${order.order_number}</b></p>
           <p style="color: #666; font-size: 11px; margin: 2px 0;">Order Time: ${formattedDate}</p>
@@ -102,35 +105,70 @@ export async function generateInvoicePdf(
           </tbody>
         </table>
 
-        <div style="margin-top: 12px; border-top: 1px dashed #333; padding-top: 8px;">
-          <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
-            <span>Sub Total:</span>
-            <span>Rs. ${Math.round((order.items && order.items.length > 0) ? order.items.reduce((acc, it) => acc + it.subtotal, 0) : Math.max(0, order.total_amount + (order.discount_amount || 0) - (order.delivery_charge || 0) - (order.gst_amount || 0)))}</span>
-          </div>
-          ${
-            order.discount_amount && order.discount_amount > 0
-              ? `<div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; color: #b91c1c; font-weight: bold;">
-                  <span>Discount ${order.discount_type === "percentage" ? `(${order.discount_value}%)` : order.discount_type === "bxgy" || order.discount_type === "offer" ? "(Offer)" : order.discount_type === "flat" ? "(Flat)" : ""}:</span>
-                  <span>-Rs. ${Math.round(order.discount_amount)}</span>
-                </div>`
-              : ""
+        ${(() => {
+          let extraList: { name: string; amount: number }[] = [];
+          if (order.extra_charges_json) {
+            try {
+              extraList = JSON.parse(order.extra_charges_json);
+            } catch {}
           }
-          ${
-            Number(order.delivery_charge || 0) > 0
-              ? `<div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
-                  <span>${order.extra_charge_name || "Packaging / Delivery"}:</span>
-                  <span>+Rs. ${Math.round(Number(order.delivery_charge))}</span>
-                </div>`
-              : ""
-          }
-          ${
-            order.gst_amount > 0
-              ? `<div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
-                  <span>GST:</span>
-                  <span>Rs. ${Math.round(order.gst_amount)}</span>
-                </div>`
-              : ""
-          }
+          const extraTotal = extraList.reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
+          const computedSubtotal = Math.round(
+            order.items && order.items.length > 0
+              ? order.items.reduce((acc, it) => acc + it.subtotal, 0)
+              : Math.max(
+                  0,
+                  order.total_amount +
+                    (order.discount_amount || 0) -
+                    (order.delivery_charge || 0) -
+                    extraTotal -
+                    (order.gst_amount || 0),
+                ),
+          );
+
+          return `
+          <div style="margin-top: 12px; border-top: 1px dashed #333; padding-top: 8px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+              <span>Sub Total:</span>
+              <span>Rs. ${computedSubtotal}</span>
+            </div>
+            ${
+              order.discount_amount && order.discount_amount > 0
+                ? `<div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; color: #b91c1c; font-weight: bold;">
+                    <span>Discount ${order.discount_type === "percentage" ? `(${order.discount_value}%)` : order.discount_type === "bxgy" || order.discount_type === "offer" ? "(Offer)" : order.discount_type === "flat" ? "(Flat)" : ""}:</span>
+                    <span>-Rs. ${Math.round(order.discount_amount)}</span>
+                  </div>`
+                : ""
+            }
+            ${
+              Number(order.delivery_charge || 0) > 0
+                ? `<div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                    <span>Delivery Charge:</span>
+                    <span>+Rs. ${Math.round(Number(order.delivery_charge))}</span>
+                  </div>`
+                : ""
+            }
+            ${
+              extraList
+                .filter((c) => Number(c.amount) > 0)
+                .map(
+                  (c) => `<div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                    <span>${c.name || "Extra Charge"}:</span>
+                    <span>+Rs. ${Math.round(Number(c.amount))}</span>
+                  </div>`,
+                )
+                .join("")
+            }
+            ${
+              order.gst_amount > 0
+                ? `<div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                    <span>GST:</span>
+                    <span>Rs. ${Math.round(order.gst_amount)}</span>
+                  </div>`
+                : ""
+            }
+          `;
+        })()}
           <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: 900; border-top: 2px dashed #000; border-bottom: 2px dashed #000; padding: 8px 0; margin-top: 6px;">
             <span>Total Rs :</span>
             <span>${Math.round(order.total_amount)}</span>

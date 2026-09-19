@@ -64,7 +64,8 @@ export async function initDatabase() {
       discount_value REAL DEFAULT 0,
       discount_amount REAL DEFAULT 0,
       delivery_charge REAL DEFAULT 0,
-      extra_charge_name TEXT DEFAULT 'Delivery Charge'
+      extra_charge_name TEXT DEFAULT 'Delivery Charge',
+      extra_charges_json TEXT
     );
 
     CREATE TABLE IF NOT EXISTS order_items (
@@ -151,6 +152,7 @@ export async function initDatabase() {
     "ALTER TABLE offers ADD COLUMN buy_qty INTEGER DEFAULT 1;",
     "ALTER TABLE offers ADD COLUMN get_qty INTEGER DEFAULT 1;",
     "ALTER TABLE products ADD COLUMN stock_quantity INTEGER DEFAULT 0;",
+    "ALTER TABLE orders ADD COLUMN extra_charges_json TEXT;",
   ];
 
   if (typeof db.execAsync === "function") {
@@ -345,6 +347,7 @@ export async function resetDatabaseToNewMenu(db: any) {
     ["delivery_enabled", "1"],
     ["delivery_charge", "30"],
     ["extra_charge_name", "Packaging / Delivery"],
+    ["fssai_number", "20726032004123"],
     ["auto_backup_enabled", "1"],
     ["backup_time", "02:00"],
     ["retention_days", "7"],

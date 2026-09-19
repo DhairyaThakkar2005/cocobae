@@ -89,6 +89,7 @@ export const SettingsScreen: React.FC = () => {
   );
   const [storePhone, setStorePhone] = useState("7043338863");
   const [storeCity, setStoreCity] = useState("Vadodara");
+  const [fssaiNumber, setFssaiNumber] = useState("20726032004123");
   const [upiId, setUpiId] = useState("7043338863m@pnb");
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstPercent, setGstPercent] = useState("5");
@@ -145,6 +146,7 @@ export const SettingsScreen: React.FC = () => {
       if (settings.store_address) setStoreAddress(settings.store_address);
       if (settings.store_phone) setStorePhone(settings.store_phone);
       if (settings.store_city) setStoreCity(settings.store_city);
+      if (settings.fssai_number) setFssaiNumber(settings.fssai_number);
       if (settings.upi_id) setUpiId(settings.upi_id);
       if (settings.gst_enabled) setGstEnabled(settings.gst_enabled === "1");
       if (settings.gst_percent) setGstPercent(settings.gst_percent);
@@ -180,6 +182,7 @@ export const SettingsScreen: React.FC = () => {
         setSetting("store_address", storeAddress.trim()),
         setSetting("store_phone", storePhone.trim()),
         setSetting("store_city", storeCity.trim()),
+        setSetting("fssai_number", fssaiNumber.trim()),
         setSetting("upi_id", upiId.trim()),
         setSetting("gst_enabled", gstEnabled ? "1" : "0"),
         setSetting("gst_percent", gstPercent.trim() || "5"),
@@ -529,6 +532,23 @@ export const SettingsScreen: React.FC = () => {
           }}
         >
           Printed directly on customer thermal bills and PDF invoices.
+        </Text>
+
+        <Input
+          label="FSSAI License Number"
+          value={fssaiNumber}
+          onChangeText={setFssaiNumber}
+          placeholder="20726032004123"
+        />
+        <Text
+          style={{
+            color: THEME.colors.textMuted,
+            fontSize: 11,
+            marginTop: -6,
+            marginBottom: 10,
+          }}
+        >
+          Printed directly on customer bills and PDF invoices after the address.
         </Text>
 
         <Input

@@ -1191,13 +1191,39 @@ export const OrderHistoryScreen: React.FC = () => {
                   }}
                 >
                   <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
-                    {editingOrder?.extra_charge_name || "Delivery Charge"}
+                    Delivery Charge
                   </Text>
                   <Text style={{ color: THEME.colors.text, fontSize: 13, fontWeight: "700" }}>
                     +{formatINR(parsedDeliv)}
                   </Text>
                 </View>
               ) : null}
+
+              {(() => {
+                let list: { name: string; amount: number }[] = [];
+                if (editingOrder?.extra_charges_json) {
+                  try {
+                    list = JSON.parse(editingOrder.extra_charges_json);
+                  } catch {}
+                }
+                return list.filter((c) => Number(c.amount) > 0).map((c, idx) => (
+                  <View
+                    key={idx}
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      marginBottom: 6,
+                    }}
+                  >
+                    <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                      {c.name || "Extra Charge"}
+                    </Text>
+                    <Text style={{ color: THEME.colors.text, fontSize: 13, fontWeight: "700" }}>
+                      +{formatINR(Number(c.amount))}
+                    </Text>
+                  </View>
+                ));
+              })()}
 
               <View
                 style={{

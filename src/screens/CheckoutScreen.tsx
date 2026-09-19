@@ -38,6 +38,9 @@ import {
   Truck,
   Utensils,
   ShoppingBag,
+  Plus,
+  Trash2,
+  Layers,
 } from "../lib/icons";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
@@ -75,6 +78,12 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     setDeliveryCharge,
     extraChargeName,
     setExtraChargeName,
+    extraCharges,
+    addExtraCharge,
+    updateExtraCharge,
+    removeExtraCharge,
+    clearExtraCharges,
+    getExtraChargesTotal,
     orderType,
     setOrderType,
     clearCart,
@@ -91,8 +100,6 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   const [activeOffers, setActiveOffers] = useState<Offer[]>([]);
   const [discountMode, setDiscountMode] = useState<"percentage" | "flat">("percentage");
   const [discountInput, setDiscountInput] = useState("");
-  const [deliveryInput, setDeliveryInput] = useState(deliveryCharge > 0 ? deliveryCharge.toString() : "");
-  const [chargeNameInput, setChargeNameInput] = useState(extraChargeName || "");
   const [customerRecord, setCustomerRecord] = useState<Customer | null>(null);
 
   const [storeSettings, setStoreSettings] = useState<{
@@ -179,19 +186,11 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         s.delivery_enabled === "true";
       if (orderType === "takeaway") {
         const defaultCharge = parseFloat(s.delivery_charge || "30") || 30;
-        const name = s.extra_charge_name || "Packaging / Delivery";
-        if (isEnabled && (deliveryCharge === 0 || !deliveryCharge)) {
+        if (isEnabled || defaultCharge > 0) {
           setDeliveryCharge(defaultCharge);
-          setDeliveryInput(defaultCharge.toString());
-          setChargeNameInput(name);
-          setExtraChargeName(name);
-        } else if (deliveryCharge > 0) {
-          setDeliveryInput(deliveryCharge.toString());
-          setChargeNameInput(extraChargeName || name);
         }
       } else {
         setDeliveryCharge(0);
-        setDeliveryInput("");
       }
     }).catch(() => {});
   }, [orderType]);
@@ -213,13 +212,6 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     }
   };
 
-  const handleDeliveryInputChange = (val: string) => {
-    const clean = val.replace(/[^0-9]/g, "");
-    setDeliveryInput(clean);
-    const num = parseInt(clean, 10) || 0;
-    setDeliveryCharge(num);
-  };
-
   const handleToggleDiscountMode = (mode: "percentage" | "flat") => {
     setDiscountMode(mode);
     const num = parseFloat(discountInput) || 0;
@@ -238,21 +230,14 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
           s.delivery_enabled === "1" ||
           s.delivery_enabled === "true";
         const defaultCharge = parseFloat(s.delivery_charge || "30") || 30;
-        const name = s.extra_charge_name || "Packaging / Delivery";
         if (isEnabled || defaultCharge > 0) {
           setDeliveryCharge(defaultCharge);
-          setDeliveryInput(defaultCharge.toString());
-          setChargeNameInput(name);
-          setExtraChargeName(name);
         }
       } catch (err) {
         console.warn("Could not load delivery settings:", err);
       }
     } else {
       setDeliveryCharge(0);
-      setDeliveryInput("");
-      setChargeNameInput("");
-      setExtraChargeName("");
     }
   };
 
@@ -265,8 +250,20 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     setLoading(true);
     try {
       const finalDeliveryCharge = orderType === "takeaway" ? (deliveryCharge || 0) : 0;
-      const finalChargeName =
-        chargeNameInput.trim() || extraChargeName.trim() || "Packaging / Delivery";
+      const validExtraCharges = extraCharges
+        .filter((c) => c.name.trim() || Number(c.amount) > 0)
+        .map((c) => ({
+          name: c.name.trim() || "Extra Charge",
+          amount: Math.max(0, Math.round(Number(c.amount) || 0)),
+        }))
+        .filter((c) => c.amount > 0);
+
+      const finalExtraChargeName =
+        validExtraCharges.length === 1
+          ? validExtraCharges[0].name
+          : validExtraCharges.length > 1
+            ? validExtraCharges.map((c) => c.name).join(", ")
+            : "Extra Charge";
 
       const orderPayload = {
         order_number: "",
@@ -283,7 +280,9 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         discount_value: selectedOffer ? selectedOffer.discount_value : discountValue,
         discount_amount: discountAmount,
         delivery_charge: finalDeliveryCharge,
-        extra_charge_name: finalChargeName,
+        extra_charge_name: finalExtraChargeName,
+        extra_charges_json:
+          validExtraCharges.length > 0 ? JSON.stringify(validExtraCharges) : undefined,
       };
 
       const itemsPayload = items.map((it) => ({
@@ -570,6 +569,13 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
 
             {/* Subtotal */}
             {(() => {
+              let extraList: { name: string; amount: number }[] = [];
+              if (successOrder.extra_charges_json) {
+                try {
+                  extraList = JSON.parse(successOrder.extra_charges_json);
+                } catch {}
+              }
+              const extraTotal = extraList.reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
               const successSubtotal =
                 successOrder.items && successOrder.items.length > 0
                   ? successOrder.items.reduce((acc, it) => acc + it.subtotal, 0)
@@ -578,6 +584,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                       successOrder.total_amount +
                         (successOrder.discount_amount || 0) -
                         (successOrder.delivery_charge || 0) -
+                        extraTotal -
                         (successOrder.gst_amount || 0),
                     );
               return (
@@ -616,7 +623,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
               </View>
             ) : null}
 
-            {/* Extra Charges if applied */}
+            {/* Delivery Charge (Takeaway) */}
             {Number(successOrder.delivery_charge || 0) > 0 ? (
               <View
                 style={{
@@ -626,13 +633,40 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 }}
               >
                 <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
-                  {successOrder.extra_charge_name || "Packaging / Delivery"}
+                  Delivery Charge
                 </Text>
                 <Text style={{ color: THEME.colors.text, fontSize: 13, fontWeight: "700" }}>
                   +{formatINR(Number(successOrder.delivery_charge))}
                 </Text>
               </View>
             ) : null}
+
+            {/* Additional Custom Extra Charges */}
+            {(() => {
+              let list: { name: string; amount: number }[] = [];
+              if (successOrder.extra_charges_json) {
+                try {
+                  list = JSON.parse(successOrder.extra_charges_json);
+                } catch {}
+              }
+              return list.filter((c) => Number(c.amount) > 0).map((c, idx) => (
+                <View
+                  key={idx}
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                    {c.name || "Extra Charge"}
+                  </Text>
+                  <Text style={{ color: THEME.colors.text, fontSize: 13, fontWeight: "700" }}>
+                    +{formatINR(Number(c.amount))}
+                  </Text>
+                </View>
+              ));
+            })()}
 
             {/* GST if applied */}
             {successOrder.gst_amount && successOrder.gst_amount > 0 ? (
@@ -1331,7 +1365,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
             ) : null}
           </View>
 
-          {/* Extra / Delivery / Packaging Charges Card */}
+          {/* Custom Extra Charges Card (Infinite multi-charge support) */}
           <View
             style={{
               backgroundColor: THEME.colors.surface,
@@ -1351,7 +1385,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
               }}
             >
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                <Truck size={18} color={THEME.colors.primary} />
+                <Layers size={18} color={THEME.colors.primary} />
                 <Text
                   numberOfLines={1}
                   style={{
@@ -1363,19 +1397,29 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 >
                   Extra Charges
                 </Text>
+                {getExtraChargesTotal() > 0 ? (
+                  <View
+                    style={{
+                      backgroundColor: THEME.colors.primary + "20",
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 12,
+                    }}
+                  >
+                    <Text style={{ color: THEME.colors.primary, fontSize: 11, fontWeight: "700" }}>
+                      +{formatINR(getExtraChargesTotal())}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
-              {deliveryCharge > 0 ? (
+
+              {extraCharges.length > 0 ? (
                 <TouchableOpacity
-                  onPress={() => {
-                    setDeliveryCharge(0);
-                    setDeliveryInput("");
-                    setChargeNameInput("");
-                    setExtraChargeName("");
-                  }}
+                  onPress={clearExtraCharges}
                   style={{
                     paddingVertical: 3,
                     paddingHorizontal: 8,
-                    backgroundColor: "#EF444420",
+                    backgroundColor: "#EF444418",
                     borderRadius: 6,
                     flexShrink: 0,
                   }}
@@ -1387,11 +1431,12 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                       fontWeight: "700",
                     }}
                   >
-                    Remove
+                    Clear All
                   </Text>
                 </TouchableOpacity>
               ) : null}
             </View>
+
             <Text
               style={{
                 color: THEME.colors.textMuted,
@@ -1399,162 +1444,170 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 marginBottom: 12,
               }}
             >
-              Add packing, delivery, or custom service charges to this order.
+              Add any additional charges (service fee, special packing, container box, late night, etc.).
             </Text>
 
-            {/* Charge Name Input */}
-            <View style={{ marginBottom: 12 }}>
-              <Text
-                style={{
-                  color: THEME.colors.textMuted,
-                  fontSize: 11,
-                  fontWeight: "700",
-                  textTransform: "uppercase",
-                  letterSpacing: 0.5,
-                  marginBottom: 6,
-                }}
-              >
-                Charge Name
-              </Text>
+            {/* Quick Presets */}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+              {[
+                { name: "Service Charge", amount: 20 },
+                { name: "Container / Box", amount: 15 },
+                { name: "Gift Packing", amount: 30 },
+                { name: "Late Night Fee", amount: 25 },
+              ].map((preset) => (
+                <TouchableOpacity
+                  key={preset.name}
+                  onPress={() => addExtraCharge(preset.name, preset.amount)}
+                  style={{
+                    backgroundColor: THEME.colors.surface2,
+                    borderWidth: 1,
+                    borderColor: THEME.colors.border,
+                    borderRadius: THEME.radius.full,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <Plus size={11} color={THEME.colors.primary} />
+                  <Text style={{ color: THEME.colors.text, fontSize: 11, fontWeight: "600" }}>
+                    {preset.name} (+₹{preset.amount})
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* List of Extra Charges */}
+            {extraCharges.length === 0 ? (
               <View
                 style={{
                   backgroundColor: THEME.colors.surface2,
                   borderRadius: THEME.radius.md,
                   borderWidth: 1,
-                  borderColor: THEME.colors.border,
-                  paddingHorizontal: 12,
+                  borderStyle: "dashed",
+                  borderColor: THEME.colors.borderStrong,
+                  padding: 14,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: 10,
                 }}
               >
-                <TextInput
-                  value={chargeNameInput}
-                  onChangeText={(text) => {
-                    setChargeNameInput(text);
-                    setExtraChargeName(text);
-                  }}
-                  placeholder="Enter charge name (e.g. Service Charge, Delivery, Packing)"
-                  placeholderTextColor={THEME.colors.textDisabled}
-                  style={{
-                    color: THEME.colors.text,
-                    fontSize: 14,
-                    fontWeight: "600",
-                    paddingVertical: 10,
-                  }}
-                />
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 12 }}>
+                  No extra charges added yet.
+                </Text>
               </View>
-            </View>
-
-            {/* Charge Amount Section */}
-            <Text
-              style={{
-                color: THEME.colors.textMuted,
-                fontSize: 11,
-                fontWeight: "700",
-                textTransform: "uppercase",
-                letterSpacing: 0.5,
-                marginBottom: 6,
-              }}
-            >
-              Charge Amount (₹)
-            </Text>
-
-            {/* Quick Delivery Charge Pills */}
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
-              {[
-                { label: "No Charge", val: 0 },
-                { label: "₹20", val: 20 },
-                { label: "₹30", val: 30 },
-                { label: "₹40", val: 40 },
-                { label: "₹50", val: 50 },
-              ].map((pill) => {
-                const isSelected = deliveryCharge === pill.val;
-                return (
-                  <TouchableOpacity
-                    key={pill.val}
-                    onPress={() => {
-                      setDeliveryCharge(pill.val);
-                      setDeliveryInput(pill.val > 0 ? pill.val.toString() : "");
-                    }}
+            ) : (
+              <View style={{ gap: 8, marginBottom: 10 }}>
+                {extraCharges.map((charge) => (
+                  <View
+                    key={charge.id}
                     style={{
-                      flex: 1,
-                      backgroundColor: isSelected
-                        ? THEME.colors.primary
-                        : THEME.colors.surface2,
-                      borderColor: isSelected
-                        ? THEME.colors.primary
-                        : THEME.colors.border,
-                      borderWidth: 1,
-                      borderRadius: THEME.radius.md,
-                      paddingVertical: 8,
+                      flexDirection: "row",
                       alignItems: "center",
-                      justifyContent: "center",
+                      backgroundColor: THEME.colors.surface2,
+                      borderRadius: THEME.radius.md,
+                      borderWidth: 1,
+                      borderColor: THEME.colors.border,
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      gap: 8,
                     }}
                   >
-                    <Text
+                    <TextInput
+                      value={charge.name}
+                      onChangeText={(val) => updateExtraCharge(charge.id, val, charge.amount)}
+                      placeholder="Charge name (e.g. Service Charge)"
+                      placeholderTextColor={THEME.colors.textDisabled}
                       style={{
-                        color: isSelected ? "#FFFFFF" : THEME.colors.text,
-                        fontSize: 11,
-                        fontWeight: "700",
+                        flex: 1,
+                        color: THEME.colors.text,
+                        fontSize: 13,
+                        fontWeight: "600",
+                        paddingVertical: 4,
+                      }}
+                    />
+
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        backgroundColor: THEME.colors.surface,
+                        borderRadius: THEME.radius.sm,
+                        borderWidth: 1,
+                        borderColor: THEME.colors.border,
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                        minWidth: 70,
                       }}
                     >
-                      {pill.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                      <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "700" }}>
+                        ₹
+                      </Text>
+                      <TextInput
+                        value={charge.amount > 0 ? String(charge.amount) : ""}
+                        onChangeText={(val) => {
+                          const num = parseInt(val.replace(/[^0-9]/g, ""), 10) || 0;
+                          updateExtraCharge(charge.id, charge.name, num);
+                        }}
+                        placeholder="0"
+                        placeholderTextColor={THEME.colors.textDisabled}
+                        keyboardType="numeric"
+                        style={{
+                          color: THEME.colors.text,
+                          fontSize: 13,
+                          fontWeight: "700",
+                          paddingVertical: 2,
+                          paddingHorizontal: 4,
+                          minWidth: 35,
+                          textAlign: "right",
+                        }}
+                      />
+                    </View>
 
-            {/* Custom Amount Input */}
-            <View
+                    <TouchableOpacity
+                      onPress={() => removeExtraCharge(charge.id)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      style={{
+                        padding: 4,
+                        borderRadius: 4,
+                        backgroundColor: "#EF444415",
+                      }}
+                    >
+                      <Trash2 size={14} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Add Another Charge Button */}
+            <TouchableOpacity
+              onPress={() => addExtraCharge("", 0)}
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                backgroundColor: THEME.colors.surface2,
+                justifyContent: "center",
+                gap: 6,
+                paddingVertical: 10,
                 borderRadius: THEME.radius.md,
-                borderWidth: 1,
-                borderColor: THEME.colors.border,
-                paddingHorizontal: 12,
+                borderWidth: 1.5,
+                borderStyle: "dashed",
+                borderColor: THEME.colors.primary,
+                backgroundColor: THEME.colors.primaryGlow,
               }}
             >
-              <Text
-                style={{
-                  color: THEME.colors.textMuted,
-                  fontSize: 14,
-                  fontWeight: "700",
-                  marginRight: 6,
-                }}
-              >
-                ₹
+              <Plus size={15} color={THEME.colors.primary} />
+              <Text style={{ color: THEME.colors.primary, fontSize: 13, fontWeight: "700" }}>
+                Add Custom Charge
               </Text>
-              <TextInput
-                value={deliveryInput}
-                onChangeText={handleDeliveryInputChange}
-                placeholder="Custom amount (e.g. 45)"
-                placeholderTextColor={THEME.colors.textDisabled}
-                keyboardType="numeric"
-                style={{
-                  flex: 1,
-                  color: THEME.colors.text,
-                  fontSize: 14,
-                  paddingVertical: 10,
-                }}
-              />
-              {deliveryInput.length > 0 ? (
-                <TouchableOpacity
-                  onPress={() => {
-                    setDeliveryInput("");
-                    setDeliveryCharge(0);
-                  }}
-                >
-                  <X size={16} color={THEME.colors.textMuted} />
-                </TouchableOpacity>
-              ) : null}
-            </View>
+            </TouchableOpacity>
 
-            {/* Real-time Applied Charge Confirmation Banner */}
-            {deliveryCharge > 0 ? (
+            {/* Total Banner */}
+            {getExtraChargesTotal() > 0 ? (
               <View
                 style={{
-                  marginTop: 12,
+                  marginTop: 10,
                   backgroundColor: THEME.colors.primary + "15",
                   borderWidth: 1,
                   borderColor: THEME.colors.primary + "40",
@@ -1568,11 +1621,11 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
                   <CheckCircle2 size={16} color={THEME.colors.primary} />
                   <Text style={{ color: THEME.colors.primary, fontSize: 13, fontWeight: "700" }}>
-                    {chargeNameInput.trim() || extraChargeName || "Extra Charge"} Applied
+                    Total Extra Charges Applied
                   </Text>
                 </View>
                 <Text style={{ color: THEME.colors.primary, fontSize: 14, fontWeight: "800" }}>
-                  +{formatINR(deliveryCharge)}
+                  +{formatINR(getExtraChargesTotal())}
                 </Text>
               </View>
             ) : null}
@@ -1862,8 +1915,8 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
               </View>
             ) : null}
 
-            {/* Extra Charge Line */}
-            {deliveryCharge > 0 ? (
+            {/* Delivery Charge (Takeaway only) */}
+            {orderType === "takeaway" && deliveryCharge > 0 ? (
               <View
                 style={{
                   flexDirection: "row",
@@ -1872,7 +1925,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 }}
               >
                 <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
-                  {chargeNameInput.trim() || extraChargeName || "Extra Charge"}
+                  Delivery Charge
                 </Text>
                 <Text
                   style={{
@@ -1885,6 +1938,31 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 </Text>
               </View>
             ) : null}
+
+            {/* Additional Custom Extra Charges */}
+            {extraCharges.filter((c) => Number(c.amount) > 0).map((c) => (
+              <View
+                key={c.id}
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  marginBottom: 6,
+                }}
+              >
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                  {c.name || "Extra Charge"}
+                </Text>
+                <Text
+                  style={{
+                    color: THEME.colors.text,
+                    fontSize: 13,
+                    fontWeight: "700",
+                  }}
+                >
+                  +{formatINR(Number(c.amount))}
+                </Text>
+              </View>
+            ))}
 
             {gstAmount > 0 ? (
               <View

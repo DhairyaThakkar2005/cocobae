@@ -35,6 +35,7 @@ export interface Order {
   discount_amount?: number;
   delivery_charge?: number;
   extra_charge_name?: string;
+  extra_charges_json?: string;
   items?: OrderItem[];
 }
 
@@ -47,8 +48,8 @@ export async function createOrder(
   const orderDate = new Date().toISOString();
 
   const insertOrderSql = `
-    INSERT INTO orders (order_number, order_date, total_amount, gst_amount, payment_method, customer_name, customer_phone, note, status, order_type, discount_type, discount_value, discount_amount, delivery_charge, extra_charge_name)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO orders (order_number, order_date, total_amount, gst_amount, payment_method, customer_name, customer_phone, note, status, order_type, discount_type, discount_value, discount_amount, delivery_charge, extra_charge_name, extra_charges_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   const orderParams = [
     orderNumber,
@@ -66,6 +67,7 @@ export async function createOrder(
     order.discount_amount || 0,
     order.delivery_charge || 0,
     order.extra_charge_name || "Delivery Charge",
+    order.extra_charges_json || null,
   ];
 
   let orderId: number;
@@ -134,6 +136,7 @@ export async function createOrder(
     discount_amount: order.discount_amount || 0,
     delivery_charge: order.delivery_charge || 0,
     extra_charge_name: order.extra_charge_name || "Extra Charge",
+    extra_charges_json: order.extra_charges_json || undefined,
     items: items.map((i) => ({ ...i, order_id: orderId })),
   };
 }
@@ -280,6 +283,10 @@ export async function updateOrder(
   if (orderData.extra_charge_name !== undefined) {
     fields.push("extra_charge_name = ?");
     params.push(orderData.extra_charge_name);
+  }
+  if (orderData.extra_charges_json !== undefined) {
+    fields.push("extra_charges_json = ?");
+    params.push(orderData.extra_charges_json);
   }
 
   if (fields.length > 0) {

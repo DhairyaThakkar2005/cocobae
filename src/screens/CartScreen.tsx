@@ -55,6 +55,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({
     setDeliveryCharge,
     extraChargeName,
     setExtraChargeName,
+    extraCharges,
     orderType,
     setOrderType,
   } = useCartStore();
@@ -545,7 +546,8 @@ export const CartScreen: React.FC<CartScreenProps> = ({
                 </View>
               ) : null}
 
-              {deliveryCharge > 0 ? (
+              {/* Delivery Charge (Takeaway only) */}
+              {orderType === "takeaway" && deliveryCharge > 0 ? (
                 <View
                   style={{
                     flexDirection: "row",
@@ -553,7 +555,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({
                   }}
                 >
                   <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
-                    {extraChargeName || "Extra Charge"}
+                    Delivery Charge
                   </Text>
                   <Text
                     style={{
@@ -566,6 +568,30 @@ export const CartScreen: React.FC<CartScreenProps> = ({
                   </Text>
                 </View>
               ) : null}
+
+              {/* Additional Custom Extra Charges */}
+              {extraCharges.filter((c) => Number(c.amount) > 0).map((c) => (
+                <View
+                  key={c.id}
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Text style={{ color: THEME.colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                    {c.name || "Extra Charge"}
+                  </Text>
+                  <Text
+                    style={{
+                      color: THEME.colors.text,
+                      fontSize: 14,
+                      fontWeight: "700",
+                    }}
+                  >
+                    +{formatINR(Number(c.amount))}
+                  </Text>
+                </View>
+              ))}
 
               {gstEnabled ? (
                 <View
